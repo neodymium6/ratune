@@ -162,6 +162,7 @@ are checked with `python3 -m unittest discover -s tools -p 'test_*.py'`.
 After `cargo build --locked -p ratune`, `python3 tools/tui_smoke.py` tests the TUI
 using a private tmux server, temporary settings and silent synthetic audio;
 it requires tmux and Python 3, but no real server or credentials.
+Use `--scenario mix`, `gallery`, `discovery`, or `jukebox` for feature checks.
 
 **Git hooks (optional):** [Lefthook](https://lefthook.dev/install/) runs `cargo fmt` before each commit when Rust files are staged. Install lefthook once (e.g. Arch: `pacman -S lefthook`, Homebrew: `brew install lefthook`, or a [standalone binary](https://github.com/evilmartians/lefthook/releases)), then from the repo root:
 
@@ -406,15 +407,13 @@ Get `session_key` once with `ratune scrobble-auth` (prints the key for config un
 
 ## Default keybinds
 
-Press `F8` to switch Local/Jukebox output. Jukebox requires a server with server-side audio output enabled and permission for the account. Connecting adopts the existing server queue without starting or changing it. Playback, seeking, volume, queue actions, album selection and Instant Mix control the server; unavailable actions are explicitly rejected. Disconnecting or quitting leaves server playback running and preserves the saved local queue/volume. Returning to Local does not resume playback. Failed writes are read back, never automatically retried; an unconfirmed state blocks further writes until refreshed. Run `python3 tools/tui_smoke.py --scenario jukebox` for synthetic checks.
+`F8` switches Local/Jukebox output; the server must enable Jukebox and permit the account. Connecting adopts its queue without changing playback. Playback, queue, album and Mix actions then control the server; unsupported actions are rejected. Disconnect/quit leaves server playback running and preserves the local queue/volume. Returning to Local does not start playback. Failed writes are read back, not retried; stale state blocks writes until refreshed.
 
-Browse (`2`) shows an artist list and album gallery. Use `Enter` to open albums and tracks, `h/l` to move between album cards, `j/k` to move by row, and `Esc` to go back without losing the album selection. `a` appends the selected album; `Ctrl+r` replaces the queue and plays it. Cover thumbnails currently use iTerm2-compatible terminals; other backends show placeholders. Folder browsing keeps its existing layout. The gallery regression scenario is `python3 tools/tui_smoke.py --scenario gallery`.
+Browse (`2`): `Enter` opens artist → albums → tracks; `h/l` moves between album cards, `j/k` between rows, and `Esc` returns with selection preserved. `a` appends the selected album; `Ctrl+r` replaces the queue and plays it. Thumbnails currently require an iTerm2-compatible backend; other backends show placeholders. Folder browsing is unchanged.
 
-Home (`1`) offers Recently Added, Rediscover, and recent-track Mix shelves. `J/K` changes shelves; `h/l` or `j/k` selects an item. `Enter` plays an album or starts a Mix; `a` appends the selection. Album requests can be cancelled with `Esc`. Rediscover uses this client's listening history, excluding albums played within 14 days. Set `[ui.hometab] discovery = false` to keep the history dashboard. Run `python3 tools/tui_smoke.py --scenario discovery` for the synthetic regression scenario.
+Home (`1`): `J/K` switches Recently Added, Rediscover, and recent-track Mix shelves; `h/l` or `j/k` selects. `Enter` plays, `a` appends, and `Esc` cancels a pending local album request. Rediscover excludes albums played in this client within 14 days. `[ui.hometab] discovery = false` restores the history dashboard.
 
-Instant Mix (`m`) replaces the queue with the selected track and similar songs returned by the server's `getSimilarSongs2` API. Select a track in Browse, Now Playing, or Home's recent-track shelf. Press `m` again to cancel. Empty results, errors, and responses received after playback or the queue changes leave the queue untouched. Configure `[keybinds] instant_mix` to rebind it, or set it to `""` to disable it. Recommendation quality and song-seed support depend on the server.
-
-The synthetic end-to-end check is `python3 tools/tui_smoke.py --scenario mix` after building.
+Instant Mix (`m`) replaces the queue using the selected track and the server's `getSimilarSongs2` recommendations. In Local mode, press `m` again to cancel; empty, failed or stale results leave the queue unchanged. Server support varies. `[keybinds] instant_mix` rebinds the action; `""` disables it.
 
 These are defaults; everything is overridable in `config.toml`. Press `i` in the app for the list that matches your file.
 
@@ -423,7 +422,7 @@ These are defaults; everything is overridable in `config.toml`. Press `i` in the
 | `1` / `2` / `3` | Home / Browse / Now playing |
 | `Tab` | Next tab (wrap) |
 | `j` / `k` | Move selection |
-| `h` / `l` | Columns / home album strip |
+| `h` / `l` | Browse album cards / Home selection |
 | `Enter` | Open / play |
 | `a` / `A` | Add track / add all |
 | `Ctrl+r` | Replace queue |
@@ -461,7 +460,7 @@ Ratune captures pointer input when your terminal supports it. Keyboard navigatio
 | Transport row | Shuffle (`⇄`), previous, play/pause, next, queue loop (`↻`) |
 | Progress bar | Seek to position |
 | Browse | Select artist, album, or track; folder mode: directory or preview row |
-| Home | Recent albums (including art strip), recent tracks, rediscover rows |
+| Home | Discovery items; legacy history lists when configured |
 | Now playing | Queue row to select; double-click same row to play; radio pane row to select station |
 
 Scroll the mouse wheel over Browse lists to move the selection (`[ui.browsetab] mouse_wheel_scroll_lines` in the sample config).

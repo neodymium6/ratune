@@ -136,6 +136,7 @@ queue_loop = true
 # shuffle             = "x"
 # unshuffle           = "z"
 # toggle_queue_loop   = "Shift+q"     # wrap queue after last track
+# instant_mix         = "m"           # start/cancel selected-track Mix; "" disables
 # toggle_radio        = "Shift+r"     # open/close internet radio picker
 # clear_queue         = "Shift+d"     # clear entire queue
 # remove_from_queue   = "d"           # now playing: remove highlighted track
@@ -337,6 +338,9 @@ lines = [
 # -----------------------------------------------------------------------------
 # [ui.hometab] — Home tab
 # -----------------------------------------------------------------------------
+
+[ui.hometab]
+discovery = true  # false restores the history dashboard
 
 # [ui.hometab.recent_albums]
 # show_art — Thumbnail strip when the terminal backend supports it. Default: true.
