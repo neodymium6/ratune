@@ -48,6 +48,35 @@ fn fit_inside_scaled(w: u32, h: u32, max_w: u32, max_h: u32, allow_upscale: bool
 /// Uses `font` so aspect ratio matches terminal **pixels** (cells are rarely square in px).
 /// Used so album art is drawn only in the cells the cover occupies — gutters stay unpainted.
 pub fn contain_fit_rect_in_cells(img: &DynamicImage, inner: Rect, font: FontSize) -> Rect {
+    contain_fit_rect(img, inner, font, false)
+}
+
+/// Now Playing uses half the panel width and height, regardless of cover resolution.
+/// Preserve aspect ratio and center the image; never crop or stretch it.
+/// Home thumbnails retain their existing no-upscale placement policy.
+pub fn now_playing_art_rect(img: &DynamicImage, inner: Rect, font: FontSize) -> Rect {
+    if inner.width == 0 || inner.height == 0 {
+        return inner;
+    }
+    let width = (inner.width / 2).max(1);
+    let height = (inner.height / 2).max(1);
+    let bounds = Rect::new(
+        inner.x + (inner.width - width) / 2,
+        inner.y + (inner.height - height) / 2,
+        width,
+        height,
+    );
+    let fit = contain_fit_rect(img, bounds, font, true);
+    // Center against the original panel to avoid two rounds of cell rounding.
+    Rect::new(
+        inner.x + (inner.width - fit.width) / 2,
+        inner.y + (inner.height - fit.height) / 2,
+        fit.width,
+        fit.height,
+    )
+}
+
+fn contain_fit_rect(img: &DynamicImage, inner: Rect, font: FontSize, allow_upscale: bool) -> Rect {
     let (iw, ih) = (img.width(), img.height());
     if iw == 0 || ih == 0 || inner.width == 0 || inner.height == 0 {
         return inner;
@@ -59,7 +88,7 @@ pub fn contain_fit_rect_in_cells(img: &DynamicImage, inner: Rect, font: FontSize
     }
     let max_w_px = inner.width as u32 * fw;
     let max_h_px = inner.height as u32 * fh;
-    let (fit_w_px, fit_h_px) = fit_inside_scaled(iw, ih, max_w_px, max_h_px, false);
+    let (fit_w_px, fit_h_px) = fit_inside_scaled(iw, ih, max_w_px, max_h_px, allow_upscale);
 
     let w = fit_w_px.div_ceil(fw).max(1).min(inner.width as u32) as u16;
     let h = fit_h_px.div_ceil(fh).max(1).min(inner.height as u32) as u16;
@@ -161,6 +190,80 @@ mod tests {
         let out = fit_image_to_pixel_budget(img, 400, 400);
         assert_eq!(out.width(), 48);
         assert_eq!(out.height(), 48);
+    }
+
+    #[test]
+    fn now_playing_square_size_is_independent_of_source_resolution() {
+        let inner = Rect::new(5, 3, 80, 40);
+        let font = (10, 20); // 800 × 800 pixels.
+        for size in [48, 128, 300, 600, 1200] {
+            let fit = now_playing_art_rect(&solid(size, size), inner, font);
+            assert_eq!(fit, Rect::new(25, 13, 40, 20), "source {size} × {size}");
+        }
+    }
+
+    #[test]
+    fn now_playing_rectangular_covers_keep_aspect_ratio_and_centering() {
+        let inner = Rect::new(5, 3, 80, 40);
+        let font = (10, 20);
+        for size in [48, 128, 300, 600] {
+            let wide = now_playing_art_rect(&solid(size * 2, size), inner, font);
+            assert_eq!(wide, Rect::new(25, 18, 40, 10));
+            let tall = now_playing_art_rect(&solid(size, size * 2), inner, font);
+            assert_eq!(tall, Rect::new(35, 13, 20, 20));
+        }
+    }
+
+    #[test]
+    fn now_playing_handles_non_square_cells_and_empty_bounds() {
+        let img = solid(128, 128);
+        let inner = Rect::new(1, 1, 105, 58);
+        let fit = now_playing_art_rect(&img, inner, (13, 27));
+        assert_eq!(fit, Rect::new(27, 17, 52, 26));
+        for empty in [Rect::new(1, 1, 0, 58), Rect::new(1, 1, 105, 0)] {
+            assert_eq!(now_playing_art_rect(&img, empty, (13, 27)), empty);
+        }
+        let half = Rect::new(27, 15, 52, 29);
+        assert_eq!(now_playing_art_rect(&img, inner, (0, 27)), half);
+        assert_eq!(now_playing_art_rect(&solid(0, 0), inner, (13, 27)), half);
+    }
+
+    #[test]
+    fn now_playing_iterm2_payload_dimensions_do_not_depend_on_source_resolution() {
+        use image::Rgba;
+        use ratatui::buffer::Buffer;
+        use ratatui_image::{
+            protocol::{iterm2::Iterm2, ImageSource, StatefulProtocol, StatefulProtocolType},
+            Resize, ResizeEncodeRender,
+        };
+
+        let inner = Rect::new(1, 1, 60, 30);
+        let font = (10, 20);
+        for size in [128, 600, 1200] {
+            let img = solid(size, size);
+            let rect = now_playing_art_rect(&img, inner, font);
+            // Follow the same prepare -> resize/encode path as Now Playing's worker.
+            let prepared = prepare_art_image_for_rect_contain_fit(img, rect, font);
+            let mut protocol = StatefulProtocol::new(
+                ImageSource::new(prepared, font, Rgba([0, 0, 0, 255])),
+                font,
+                StatefulProtocolType::ITerm2(Iterm2 {
+                    is_tmux: true,
+                    ..Iterm2::default()
+                }),
+            );
+            protocol.resize_encode_render(
+                &Resize::Scale(Some(FilterType::Triangle)),
+                rect,
+                &mut Buffer::empty(inner),
+            );
+            protocol.last_encoding_result().unwrap().unwrap();
+            let StatefulProtocolType::ITerm2(encoded) = protocol.protocol_type() else {
+                panic!("expected iTerm2");
+            };
+            assert_eq!(encoded.area, Rect::new(0, 0, 30, 15));
+            assert!(encoded.data.contains(";width=300px;height=300px;"));
+        }
     }
 
     #[test]

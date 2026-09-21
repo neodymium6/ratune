@@ -6,9 +6,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result};
-use crossterm::event::{
-    DisableFocusChange, DisableMouseCapture, EnableFocusChange, EnableMouseCapture,
-};
+use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
@@ -85,20 +83,10 @@ pub fn prepare_library_fuzzy_picker_args(binary: &str, mut args: Vec<String>) ->
 }
 
 /// Suspend the TUI so a subprocess can use the terminal normally.
-pub fn suspend_tui<W: Write>(
-    terminal: &mut Terminal<CrosstermBackend<W>>,
-    in_tmux: bool,
-) -> Result<()> {
+pub fn suspend_tui<W: Write>(terminal: &mut Terminal<CrosstermBackend<W>>) -> Result<()> {
     disable_raw_mode().context("disable_raw_mode")?;
     terminal.backend_mut().execute(DisableMouseCapture)?;
-    if in_tmux {
-        terminal
-            .backend_mut()
-            .write_all(b"\x1bPtmux;\x1b\x1b[?1004l\x1b\\")?;
-        terminal.backend_mut().flush()?;
-    } else {
-        terminal.backend_mut().execute(DisableFocusChange)?;
-    }
+    crate::tty::set_focus_reporting(terminal.backend_mut(), false)?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
     terminal.show_cursor()?;
     terminal.backend_mut().flush()?;
@@ -106,21 +94,11 @@ pub fn suspend_tui<W: Write>(
 }
 
 /// Restore raw mode + alternate screen after a subprocess exits.
-pub fn resume_tui<W: Write>(
-    terminal: &mut Terminal<CrosstermBackend<W>>,
-    in_tmux: bool,
-) -> Result<()> {
+pub fn resume_tui<W: Write>(terminal: &mut Terminal<CrosstermBackend<W>>) -> Result<()> {
     enable_raw_mode().context("enable_raw_mode")?;
     terminal.backend_mut().execute(EnterAlternateScreen)?;
     terminal.backend_mut().execute(EnableMouseCapture)?;
-    if in_tmux {
-        terminal
-            .backend_mut()
-            .write_all(b"\x1bPtmux;\x1b\x1b[?1004h\x1b\\")?;
-        terminal.backend_mut().flush()?;
-    } else {
-        terminal.backend_mut().execute(EnableFocusChange)?;
-    }
+    crate::tty::set_focus_reporting(terminal.backend_mut(), true)?;
     terminal.hide_cursor()?;
     terminal.backend_mut().flush()?;
     Ok(())

@@ -1,3 +1,8 @@
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
+
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
@@ -73,6 +78,10 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect, is_active: bool) {
     let start = app.queue.scroll.min(total.saturating_sub(1));
     let end = (start + visible).min(total);
     let favorite_prefix = app.theme.icons.favorite_prefix();
+    // Styles/cursor movement do not damage passthrough images. Changed text
+    // (scroll, reorder, new queue) may make tmux redraw the entire text row.
+    let mut text_key = DefaultHasher::new();
+    area.hash(&mut text_key);
     let items: Vec<ListItem> = app.queue.songs[start..end]
         .iter()
         .enumerate()
@@ -85,6 +94,7 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect, is_active: bool) {
                 &app.config.rating_stars,
                 &favorite_prefix,
             );
+            label.hash(&mut text_key);
 
             let style = if idx == app.queue.cursor {
                 Style::default()
@@ -96,6 +106,7 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect, is_active: bool) {
             ListItem::new(label).style(style)
         })
         .collect();
+    app.np_queue_text_key = Some(text_key.finish());
 
     let list = List::new(items)
         .block(block)

@@ -36,8 +36,8 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use crossterm::event::{
-    self, DisableFocusChange, DisableMouseCapture, EnableFocusChange, EnableMouseCapture, Event,
-    KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEventKind,
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+    MouseButton, MouseEventKind,
 };
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -158,16 +158,7 @@ pub async fn run() -> Result<()> {
     let mut stdout = io::stdout();
     stdout.execute(EnterAlternateScreen)?;
     stdout.execute(EnableMouseCapture)?;
-    // Enable focus-change reporting. Inside tmux the bare CSI sequence is
-    // swallowed by tmux itself; wrap it in a DCS passthrough so the outer
-    // terminal (Ghostty) receives it.  Outside tmux the crossterm helper is fine.
-    if app.in_tmux {
-        use std::io::Write;
-        stdout.write_all(b"\x1bPtmux;\x1b\x1b[?1004h\x1b\\")?;
-        stdout.flush()?;
-    } else {
-        stdout.execute(EnableFocusChange)?;
-    }
+    tty::set_focus_reporting(&mut stdout, true)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -223,15 +214,7 @@ pub async fn run() -> Result<()> {
     // Restore terminal regardless of errors.
     disable_raw_mode()?;
     terminal.backend_mut().execute(DisableMouseCapture)?;
-    if app.in_tmux {
-        use std::io::Write;
-        terminal
-            .backend_mut()
-            .write_all(b"\x1bPtmux;\x1b\x1b[?1004l\x1b\\")?;
-        std::io::Write::flush(terminal.backend_mut())?;
-    } else {
-        terminal.backend_mut().execute(DisableFocusChange)?;
-    }
+    tty::set_focus_reporting(terminal.backend_mut(), false)?;
     terminal.backend_mut().execute(LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
@@ -300,7 +283,7 @@ fn run_library_fzf_picker(
         return Ok(());
     }
 
-    fzf_picker::suspend_tui(terminal, app.in_tmux)?;
+    fzf_picker::suspend_tui(terminal)?;
     let cols = app.config.fzf.columns;
     let input = library_index::fzf_input_lines(&tracks, cols);
     let mut fzf_args = app.config.fzf.args.clone();
@@ -316,7 +299,7 @@ fn run_library_fzf_picker(
     }
     let fzf_args = fzf_picker::prepare_library_fuzzy_picker_args(&app.config.fzf.binary, fzf_args);
     let res = fzf_picker::run_fzf(&app.config.fzf.binary, &fzf_args, &input);
-    if let Err(e) = fzf_picker::resume_tui(terminal, app.in_tmux) {
+    if let Err(e) = fzf_picker::resume_tui(terminal) {
         eprintln!("resume terminal after fzf: {e}");
     }
     // Subprocess UI may leave the alternate buffer and Kitty graphics out of sync;
@@ -411,6 +394,7 @@ async fn run_loop(
     // this latch the loop retries every frame and spams stderr.
     let mut kitty_cover_unrenderable: Option<String> = None;
     let mut last_tab = app.active_tab;
+    let mut iterm2_overlay = ui::iterm2_overlay::Iterm2Overlay::default();
 
     // 2-second fallback: nudge Kitty art re-transmit when it is missing.
     // Checked once per loop iteration (see below).
@@ -487,13 +471,34 @@ async fn run_loop(
             Err(e) => return Err(e.into()),
         }
 
+        // Composite cached iTerm2 art after any full-line text redraw by tmux.
+        let iterm2_image = app.np_iterm2_rect.and_then(|rect| {
+            match app.np_art_state.as_ref()?.protocol_type()? {
+                ratatui_image::protocol::StatefulProtocolType::ITerm2(image) => {
+                    Some((image, rect, app.art_cache_fingerprint?))
+                }
+                _ => None,
+            }
+        });
+        let queue_text_key = if app.in_tmux {
+            app.np_queue_text_key
+        } else {
+            None
+        };
+        match iterm2_overlay.draw(terminal.backend_mut(), iterm2_image, queue_text_key) {
+            Ok(()) => {}
+            Err(e) if tty::io_disconnect(&e) => app.should_quit = true,
+            Err(e) if tty::io_interrupted(&e) => {}
+            Err(e) => return Err(e.into()),
+        }
+
         app.apply_home_strip_resize_settle();
 
         drain_ratatui_np_resize_completions(app);
 
         if app.ratatui_art_ready() && !app.ratatui_uses_kitty_apc() {
             for (_id, st) in app.home_strip_art.iter_mut() {
-                if let Some(Err(e)) = st.last_encoding_result() {
+                if let Some(Err(e)) = st.protocol.last_encoding_result() {
                     eprintln!("home strip art: {e}");
                 }
             }
@@ -599,7 +604,7 @@ async fn run_loop(
                                     .unwrap_or((10, 20));
                                 let placement = if app.ensure_art_cache_decoded() {
                                     app.art_cache_decoded.as_ref().map(|(_, img)| {
-                                        ui::art_prepare::contain_fit_rect_in_cells(img, inner, font)
+                                        ui::art_prepare::now_playing_art_rect(img, inner, font)
                                     })
                                 } else {
                                     None

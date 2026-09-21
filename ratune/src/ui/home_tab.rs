@@ -7,7 +7,6 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::Frame;
 use ratatui_image::picker::ProtocolType;
-use ratatui_image::StatefulImage;
 
 use crate::app::{App, HomeSection, HomeState, RecentAlbum};
 use crate::config::{Config, HomePanel};
@@ -415,15 +414,15 @@ fn render_art_strip_ratatui(f: &mut Frame, albums_inner: Rect, app: &mut App, _i
                     fs,
                 );
                 let proto = picker.new_resize_protocol(prepared);
-                app.home_strip_art.insert(album_id.clone(), proto);
+                app.home_strip_art
+                    .insert(album_id.clone(), super::strip_art::StripArt::new(proto));
                 app.home_strip_last_cells.insert(album_id.clone(), slot);
                 if is_sixel {
                     sixel_builds_this_frame += 1;
                 }
             }
             if let Some(state) = app.home_strip_art.get_mut(&album_id) {
-                let w = StatefulImage::default().resize(img_resize.clone());
-                f.render_stateful_widget(w, art_rect, state);
+                state.render(f, art_rect, img_resize.clone());
             }
         }
     }
