@@ -406,6 +406,8 @@ Get `session_key` once with `ratune scrobble-auth` (prints the key for config un
 
 ## Default keybinds
 
+Press `F8` to switch Local/Jukebox output. Jukebox requires a server with server-side audio output enabled and permission for the account. Connecting adopts the existing server queue without starting or changing it. Playback, seeking, volume, queue actions, album selection and Instant Mix control the server; unavailable actions are explicitly rejected. Disconnecting or quitting leaves server playback running and preserves the saved local queue/volume. Returning to Local does not resume playback. Failed writes are read back, never automatically retried; an unconfirmed state blocks further writes until refreshed. Run `python3 tools/tui_smoke.py --scenario jukebox` for synthetic checks.
+
 Browse (`2`) shows an artist list and album gallery. Use `Enter` to open albums and tracks, `h/l` to move between album cards, `j/k` to move by row, and `Esc` to go back without losing the album selection. `a` appends the selected album; `Ctrl+r` replaces the queue and plays it. Cover thumbnails currently use iTerm2-compatible terminals; other backends show placeholders. Folder browsing keeps its existing layout. The gallery regression scenario is `python3 tools/tui_smoke.py --scenario gallery`.
 
 Home (`1`) offers Recently Added, Rediscover, and recent-track Mix shelves. `J/K` changes shelves; `h/l` or `j/k` selects an item. `Enter` plays an album or starts a Mix; `a` appends the selection. Album requests can be cancelled with `Esc`. Rediscover uses this client's listening history, excluding albums played within 14 days. Set `[ui.hometab] discovery = false` to keep the history dashboard. Run `python3 tools/tui_smoke.py --scenario discovery` for the synthetic regression scenario.
@@ -431,6 +433,7 @@ These are defaults; everything is overridable in `config.toml`. Press `i` in the
 | `x` / `z` | Shuffle / unshuffle |
 | `Q` | Toggle queue loop |
 | `m` | Instant Mix / cancel pending mix |
+| `F8` | Switch Local / server-side Jukebox output |
 | `Shift+R` | Internet radio station picker |
 | `Ctrl+g` | Now Playing: radio pane ↔ library queue |
 | `+` / `-` | Volume |

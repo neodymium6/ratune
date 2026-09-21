@@ -1,6 +1,26 @@
 use super::*;
 
 #[test]
+fn jukebox_switch_is_available_on_every_tab_and_clears_pending_gg() {
+    let kb = Keybinds::from_section(&config::KeybindsSection::default());
+    for tab in [Tab::Home, Tab::Browser, Tab::NowPlaying] {
+        let mut pending = true;
+        assert!(matches!(
+            map_key(
+                KeyCode::F(8),
+                KeyModifiers::NONE,
+                tab,
+                &kb,
+                &mut pending,
+                false
+            ),
+            Action::ToggleJukebox
+        ));
+        assert!(!pending);
+    }
+}
+
+#[test]
 fn default_mix_key_is_available_on_all_tabs() {
     let kb = Keybinds::from_section(&config::KeybindsSection::default());
     for tab in [Tab::Browser, Tab::NowPlaying, Tab::Home] {

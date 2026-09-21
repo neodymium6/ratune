@@ -1,6 +1,7 @@
 mod browser_gallery;
 mod discovery;
 mod instant_mix;
+mod jukebox_control;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -315,6 +316,11 @@ pub struct HomeState {
 
 #[derive(Debug)]
 pub enum LibraryUpdate {
+    Jukebox {
+        id: u64,
+        result: Result<ratune_subsonic::JukeboxPlaylist, String>,
+        recovered: Option<ratune_subsonic::JukeboxPlaylist>,
+    },
     DiscoveryShelves {
         request_id: u64,
         newest: Result<Vec<ratune_subsonic::Album>, String>,
@@ -578,6 +584,7 @@ pub struct App {
     library_tx: mpsc::Sender<LibraryUpdate>,
     /// Send commands to the audio engine thread.
     pub player_tx: crate::local_output::LocalOutput,
+    pub jukebox: crate::jukebox::Jukebox,
     /// Receive events from the audio engine thread.
     pub player_rx: std_mpsc::Receiver<PlayerEvent>,
     /// Join handle for the audio engine thread; taken on shutdown.
@@ -890,6 +897,7 @@ impl App {
             library_rx,
             library_tx,
             player_tx: crate::local_output::LocalOutput::new(player_tx),
+            jukebox: crate::jukebox::Jukebox::default(),
             player_rx,
             player_join: Some(player_join),
             config,
@@ -3061,7 +3069,21 @@ impl App {
     // ── Library update ingestion ──────────────────────────────────────────────
 
     pub fn apply_library_update(&mut self, update: LibraryUpdate) {
+        if self.jukebox.active()
+            && matches!(
+                &update,
+                LibraryUpdate::AllTracksForArtist { .. }
+                    | LibraryUpdate::LibraryServerAppendQueueComplete { .. }
+            )
+        {
+            return;
+        }
         match update {
+            LibraryUpdate::Jukebox {
+                id,
+                result,
+                recovered,
+            } => self.apply_jukebox(id, result, recovered),
             update @ (LibraryUpdate::DiscoveryShelves { .. }
             | LibraryUpdate::DiscoveryAlbum { .. }) => {
                 self.apply_discovery_update(update);
@@ -3841,6 +3863,9 @@ impl App {
     }
 
     pub fn handle_player_event(&mut self, event: PlayerEvent) {
+        if self.jukebox.active() {
+            return;
+        }
         let progress_only = matches!(&event, PlayerEvent::Progress { .. });
         match event {
             PlayerEvent::TrackStarted => {
@@ -4133,6 +4158,10 @@ impl App {
     /// Handle D-Bus MPRIS remote control (Linux).
     #[cfg(target_os = "linux")]
     pub fn handle_mpris_control(&mut self, c: crate::mpris::MprisControl) {
+        if self.jukebox.active() {
+            self.flash_status("Use the TUI to control Jukebox playback");
+            return;
+        }
         use crate::mpris::MprisControl::*;
         match c {
             PlayPause => {
@@ -4223,6 +4252,10 @@ impl App {
 
     /// Send a PlayUrl command for the song the queue cursor points at.
     fn play_current(&mut self) {
+        if self.jukebox.active() {
+            self.jukebox_operation(crate::jukebox::Intent::Play(self.queue.cursor));
+            return;
+        }
         if let Some(song) = self.queue.current().cloned() {
             self.np_pane_focus = NowPlayingPaneFocus::Queue;
             self.play_gen += 1;
@@ -5536,6 +5569,9 @@ impl App {
     // ── Action dispatch ───────────────────────────────────────────────────────
 
     pub fn dispatch(&mut self, action: Action) {
+        if self.dispatch_jukebox(&action) {
+            return;
+        }
         if self.active_tab == Tab::Home
             && self.config.home_discovery
             && self.dispatch_discovery(&action)
@@ -5546,6 +5582,7 @@ impl App {
         }
         let mpris_action_hook = action.clone();
         match action {
+            Action::ToggleJukebox => unreachable!("handled by output router"),
             Action::ToggleHelp => {
                 self.pending_gg = false;
                 let was_visible = self.help_visible;
@@ -7573,6 +7610,10 @@ impl App {
     pub fn double_click_browser_artist(&mut self, orig_idx: usize) {
         self.click_browser_artist(orig_idx);
         self.browser_focus = BrowserColumn::Artists;
+        if self.jukebox.active() {
+            self.dispatch(Action::Select);
+            return;
+        }
         if let Some(artist) = self.library.current_artist() {
             let artist_id = artist.id.clone();
             self.fetch_all_tracks_for_artist(artist_id, self.queue.songs.is_empty(), false);
@@ -7615,6 +7656,10 @@ impl App {
         self.click_browser_album(orig_idx);
         if let Some(album_id) = album_id {
             self.browser_focus = BrowserColumn::Albums;
+            if self.jukebox.active() {
+                self.dispatch(Action::AddToQueue);
+                return;
+            }
             self.fetch_and_append_album_to_queue(album_id);
         }
     }
@@ -7628,6 +7673,10 @@ impl App {
     pub fn double_click_folder_dir(&mut self, visible_pos: usize) {
         self.click_folder_dir(visible_pos);
         self.browser_focus = BrowserColumn::Tracks;
+        if self.jukebox.active() {
+            self.flash_status("Folder playback is not available in Jukebox yet");
+            return;
+        }
         self.handle_add_all_to_queue(AddAllMode::Append);
     }
 
@@ -7675,7 +7724,7 @@ impl App {
         match rows[clicked] {
             FolderPreviewRow::Track(_) => {
                 self.browser_focus = BrowserColumn::Tracks;
-                self.handle_add_to_queue();
+                self.dispatch(Action::AddToQueue);
             }
             FolderPreviewRow::Dir(_) => {
                 self.folder_activate_preview_selection();
@@ -7700,7 +7749,7 @@ impl App {
     pub fn double_click_browser_track(&mut self, orig_idx: usize) {
         self.click_browser_track(orig_idx);
         self.browser_focus = BrowserColumn::Tracks;
-        self.handle_add_to_queue();
+        self.dispatch(Action::AddToQueue);
     }
 
     /// Mouse click on a visible queue row in the Now Playing tab.
@@ -7710,7 +7759,11 @@ impl App {
 
     pub fn double_click_queue_row(&mut self, idx: usize) {
         self.set_queue_cursor(idx);
-        self.play_queue_from_np();
+        if self.jukebox.active() {
+            self.jukebox_operation(crate::jukebox::Intent::Play(idx));
+        } else {
+            self.play_queue_from_np();
+        }
     }
 
     pub fn set_queue_cursor(&mut self, idx: usize) {

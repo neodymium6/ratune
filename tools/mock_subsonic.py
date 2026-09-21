@@ -8,6 +8,7 @@ import time
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
+from mock_jukebox import JukeboxFixture
 
 
 def song(song_id, title, track):
@@ -17,7 +18,7 @@ def song(song_id, title, track):
 
 
 class Fixture:
-    def __init__(self, gallery=False, discovery_failures=False):
+    def __init__(self, gallery=False, discovery_failures=False, jukebox=False):
         self.lock = threading.RLock()
         self.discovery_failures = discovery_failures
         self.songs = [song(key, title, i + 1) for i, (key, title) in enumerate([
@@ -40,6 +41,7 @@ class Fixture:
                                             year=2000+i, songCount=3, song=tracks)
             self.artist.update(albumCount=len(self.albums), album=list(self.albums.values()))
         self.streams = 0
+        self.jukebox = JukeboxFixture(self) if jukebox else None
         self.requests = []
         audio = io.BytesIO()
         with wave.open(audio, "wb") as wav:
@@ -51,6 +53,8 @@ class Fixture:
 
     def response(self, endpoint, params):
         seed = params.get("id", [""])[0]
+        if endpoint == "jukeboxControl":
+            return self.jukebox.response(params) if self.jukebox else JukeboxFixture.error("Jukebox disabled")
         if endpoint == "getAlbumList2":
             albums = list(self.albums.values())
             if params.get("type") == ["newest"]:

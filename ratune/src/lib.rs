@@ -11,14 +11,14 @@ mod fzf_picker;
 mod history;
 mod instant_mix;
 mod jukebox;
+#[cfg(test)]
+mod key_tests;
 mod keybinds;
 mod keyring_init;
 mod library_index;
 mod local_output;
 mod lyrics;
 mod lyrics_cache;
-#[cfg(test)]
-mod mix_key_tests;
 mod mouse_click;
 mod mpris;
 mod persist;
@@ -261,6 +261,12 @@ fn run_library_fzf_picker(
     use crate::fzf_picker;
     use crate::library_index;
 
+    if app.jukebox.active() {
+        app.flash_status(
+            "Jukebox: use Home or Browse selection; fzf playback is not available yet",
+        );
+        return Ok(());
+    }
     app.pending_gg = false;
 
     if !app.config.library_index_enabled {
@@ -448,6 +454,7 @@ async fn run_loop(
 
         // Expire status flash messages.
         app.tick_status_flash();
+        app.tick_jukebox();
         app.tick_playlist_tracks_fetch();
 
         if connectivity_interval != Duration::MAX
@@ -1639,6 +1646,10 @@ fn map_key(
     pending_gg: &mut bool,
     ratings_enabled: bool,
 ) -> Action {
+    if code == KeyCode::F(8) && modifiers.is_empty() {
+        *pending_gg = false;
+        return Action::ToggleJukebox;
+    }
     // Second `g` after a lone `g`: vim-style `gg` → top.
     if *pending_gg {
         *pending_gg = false;
