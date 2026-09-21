@@ -1,23 +1,36 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
       - main
       - master
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   rust:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       # rodio/cpal → alsa-sys needs ALSA headers + alsa.pc (pkg-config).
       - name: Install system dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libasound2-dev libdbus-1-dev pkg-config
@@ -30,7 +43,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: cargo clippy
-        run: cargo clippy --workspace --all-targets
+        run: cargo clippy --workspace --all-targets --locked
+
+      - name: cargo build
+        run: cargo build --workspace --locked
 
       - name: cargo test
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
