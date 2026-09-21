@@ -8,11 +8,14 @@ mod desktop_notify;
 mod favorites_cache;
 mod fzf_picker;
 mod history;
+mod instant_mix;
 mod keybinds;
 mod keyring_init;
 mod library_index;
 mod lyrics;
 mod lyrics_cache;
+#[cfg(test)]
+mod mix_key_tests;
 mod mouse_click;
 mod mpris;
 mod persist;
@@ -1832,6 +1835,13 @@ fn map_key(
     }
     if kb.toggle_queue_loop.matches(code, modifiers) {
         return Action::ToggleQueueLoop;
+    }
+    if kb
+        .instant_mix
+        .as_ref()
+        .is_some_and(|key| key.matches(code, modifiers))
+    {
+        return Action::InstantMix;
     }
     if active_tab == Tab::NowPlaying && kb.np_focus_queue.matches(code, modifiers) {
         return Action::ToggleNpPaneFocus;

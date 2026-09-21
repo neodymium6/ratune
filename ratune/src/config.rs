@@ -89,6 +89,8 @@ pub struct KeybindsSection {
     pub unshuffle: Option<String>,
     /// Toggle queue loop after the last track. Default: Shift+q
     pub toggle_queue_loop: Option<String>,
+    /// Start or cancel Instant Mix. Default: m; empty disables the binding.
+    pub instant_mix: Option<String>,
     /// Open or close the internet radio station picker. Default: Shift+r
     pub toggle_radio: Option<String>,
     /// Toggle Now Playing focus between live radio and library queue. Default: Ctrl+g
@@ -1956,6 +1958,7 @@ max_bit_rate = 0   # 0 = unlimited; set e.g. 320 to cap streaming bitrate
 # shuffle       = "x"
 # unshuffle     = "z"
 # toggle_queue_loop = "Q"
+# instant_mix      = "m"  # empty string disables
 # toggle_radio      = "R"
 # np_focus_queue = "Ctrl+g"
 # clear_queue   = "Shift+d"

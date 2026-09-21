@@ -406,6 +406,10 @@ Get `session_key` once with `ratune scrobble-auth` (prints the key for config un
 
 ## Default keybinds
 
+Instant Mix (`m`) replaces the queue with the selected track and similar songs returned by the server's `getSimilarSongs2` API. Select a track in Browse or Now Playing; on Home, the playing track is used. Press `m` again to cancel. Empty results, errors, and responses received after playback or the queue changes leave the queue untouched. Configure `[keybinds] instant_mix` to rebind it, or set it to `""` to disable it. Recommendation quality and song-seed support depend on the server.
+
+The synthetic end-to-end check is `python3 tools/tui_smoke.py --scenario mix` after building.
+
 These are defaults; everything is overridable in `config.toml`. Press `i` in the app for the list that matches your file.
 
 | Key | Action |
@@ -422,6 +426,7 @@ These are defaults; everything is overridable in `config.toml`. Press `i` in the
 | `f` / `F` | Toggle favorite / toggle favorites panel (Browse) |
 | `x` / `z` | Shuffle / unshuffle |
 | `Q` | Toggle queue loop |
+| `m` | Instant Mix / cancel pending mix |
 | `Shift+R` | Internet radio station picker |
 | `Ctrl+g` | Now Playing: radio pane ↔ library queue |
 | `+` / `-` | Volume |

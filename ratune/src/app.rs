@@ -1,3 +1,5 @@
+mod instant_mix;
+
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -338,6 +340,11 @@ pub enum LibraryUpdate {
         msg: String,
         secs: u64,
     },
+    InstantMix {
+        request_id: u64,
+        seed: ratune_subsonic::Song,
+        result: Result<Vec<ratune_subsonic::Song>, String>,
+    },
     /// Lyrics fetched for a song; `lines` is empty when the track has no lyrics.
     Lyrics {
         song_id: String,
@@ -601,6 +608,8 @@ pub struct App {
     /// Monotonically increasing counter sent with every play command (`PlayUrl` / `PlayCached`).
     /// The engine uses it to discard stale downloads from rapid skips.
     play_gen: u64,
+    instant_mix: crate::instant_mix::InstantMixState,
+    instant_mix_task: Option<tokio::task::AbortHandle>,
 
     // ── Library metadata index (Milestone 2) ───────────────────────────────────
     /// Cached tracks for fzf (text only; persisted under `~/.cache/ratune/` by default).
@@ -884,6 +893,8 @@ impl App {
             keybinds,
             theme,
             play_gen: 0,
+            instant_mix: crate::instant_mix::InstantMixState::default(),
+            instant_mix_task: None,
             library_index_tracks,
             library_index_by_id,
             library_index_refreshed_at,
@@ -3172,6 +3183,13 @@ impl App {
             }
             LibraryUpdate::StatusFlash { msg, secs } => {
                 self.flash_status_secs(msg, secs);
+            }
+            LibraryUpdate::InstantMix {
+                request_id,
+                seed,
+                result,
+            } => {
+                self.apply_instant_mix(request_id, seed, result);
             }
             LibraryUpdate::Lyrics { song_id, lines } => {
                 self.lyrics_loading = false;
@@ -5797,6 +5815,7 @@ impl App {
             Action::Shuffle => self.handle_shuffle(),
             Action::Unshuffle => self.handle_unshuffle(),
             Action::ToggleQueueLoop => self.handle_toggle_queue_loop(),
+            Action::InstantMix => self.handle_instant_mix(),
             Action::ToggleNpPaneFocus => self.handle_toggle_np_pane_focus(),
             Action::SeekForward => {
                 let new_pos = if let Some(total) = self.playback.total {
@@ -7314,6 +7333,10 @@ impl App {
     }
 
     fn handle_clear_queue(&mut self) {
+        self.instant_mix.cancel();
+        if let Some(task) = self.instant_mix_task.take() {
+            task.abort();
+        }
         self.queue.songs.clear();
         self.queue.cursor = 0;
         self.queue.scroll = 0;

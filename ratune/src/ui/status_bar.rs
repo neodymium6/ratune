@@ -106,6 +106,9 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
             Span::styled("Ctrl+C", Style::default().fg(t.dimmed)),
             Span::raw(" cancel"),
         ])
+    } else if let Some(message) = app.instant_mix_status() {
+        let shown = fit_status_bar_text(&message, area.width as usize);
+        Line::from(vec![Span::styled(shown, Style::default().fg(app.accent()))])
     } else if app.search_filter.is_some() {
         let q = app.search_filter.as_deref().unwrap_or("");
         Line::from(vec![
