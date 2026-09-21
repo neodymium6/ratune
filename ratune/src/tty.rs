@@ -7,6 +7,23 @@
 use std::io;
 use std::io::IsTerminal;
 
+/// Request focus events from the immediate terminal (tmux when inside a pane).
+///
+/// Do not DCS-wrap this as graphics passthrough: tmux must see DECSET 1004 to
+/// mark this pane as a subscriber. With `focus-events on`, tmux manages the
+/// outer terminal and reports pane/window switches as FocusLost/FocusGained.
+pub fn set_focus_reporting(writer: &mut impl io::Write, enabled: bool) -> io::Result<()> {
+    use crossterm::event::{DisableFocusChange, EnableFocusChange};
+    use crossterm::ExecutableCommand;
+
+    if enabled {
+        writer.execute(EnableFocusChange)?;
+    } else {
+        writer.execute(DisableFocusChange)?;
+    }
+    Ok(())
+}
+
 /// I/O errors that mean the terminal session is gone.
 pub fn io_disconnect(err: &io::Error) -> bool {
     if matches!(
@@ -215,6 +232,22 @@ pub fn stdin_has_input() -> bool {
 mod tests {
     use super::*;
     use std::io;
+
+    #[test]
+    fn focus_enable_is_unwrapped_so_tmux_registers_the_pane() {
+        let mut output = Vec::new();
+        set_focus_reporting(&mut output, true).unwrap();
+        assert_eq!(output, b"\x1b[?1004h");
+    }
+
+    #[test]
+    fn focus_suspend_resume_and_exit_use_the_same_terminal_scope() {
+        let mut output = Vec::new();
+        set_focus_reporting(&mut output, false).unwrap();
+        set_focus_reporting(&mut output, true).unwrap();
+        set_focus_reporting(&mut output, false).unwrap();
+        assert_eq!(output, b"\x1b[?1004l\x1b[?1004h\x1b[?1004l");
+    }
 
     fn err(kind: io::ErrorKind) -> io::Error {
         io::Error::new(kind, "test")
