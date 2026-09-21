@@ -15,6 +15,7 @@ const KEY_COL_W: usize = 12;
 fn sections(
     radio_enabled: bool,
     ratings_enabled: bool,
+    discovery: bool,
 ) -> Vec<(&'static str, Vec<(&'static str, &'static str)>)> {
     let mut playback = vec![
         ("p / Space", "Play / pause"),
@@ -55,13 +56,36 @@ fn sections(
             ],
         ),
         (
-            "Home Tab",
+            "Home Tab (1)",
+            if discovery {
+                vec![
+                    ("h/l · j/k", "Select album or recent Mix seed"),
+                    ("J / K", "Switch discovery shelf"),
+                    ("r", "Refresh discovery shelves"),
+                    ("Enter", "Play album / Mix from selected recent track"),
+                    ("a", "Append selected album / track to queue"),
+                    ("Esc", "Cancel pending album action"),
+                ]
+            } else {
+                vec![
+                    ("h / l", "Select album"),
+                    ("j / k", "Navigate list"),
+                    ("J / K", "Switch section"),
+                    ("r", "Re-roll rediscover"),
+                    ("Enter", "Go to artist in Browse"),
+                ]
+            },
+        ),
+        (
+            "Album Browser (2)",
             vec![
-                ("h / l", "Select album"),
-                ("j / k", "Navigate list"),
-                ("J / K", "Switch section"),
-                ("r", "Re-roll rediscover"),
-                ("Enter", "Go to artist in Browse"),
+                ("Enter", "Artist → album gallery → tracks"),
+                ("h / l", "Previous / next album card"),
+                ("j / k", "Previous / next album row"),
+                ("Esc", "Tracks → albums → artists"),
+                ("a", "Queue selected album (gallery) / track (tracks)"),
+                ("Ctrl+r", "Play selected album (replace queue)"),
+                ("m", "Start Instant Mix from selected track"),
             ],
         ),
         ("Playback", playback),
@@ -231,13 +255,18 @@ fn pack_blocks_into_two_columns(
 }
 
 /// Popup bounds for the keybind help overlay (matches `render_help` sizing).
-pub fn help_popup_rect(area: Rect, radio_enabled: bool, ratings_enabled: bool) -> Rect {
+pub fn help_popup_rect(
+    area: Rect,
+    radio_enabled: bool,
+    ratings_enabled: bool,
+    discovery: bool,
+) -> Rect {
     use ratatui::style::Color;
 
     // Colors are only used for line content; lengths depend on section text alone.
     let accent = Color::White;
     let mut blocks = build_blocks(
-        sections(radio_enabled, ratings_enabled),
+        sections(radio_enabled, ratings_enabled, discovery),
         accent,
         accent,
         accent,
@@ -279,7 +308,11 @@ pub fn render_help(app: &mut App, frame: &mut Frame) {
     // roughly equal column heights.
 
     let mut blocks = build_blocks(
-        sections(app.config.radio_enabled, app.config.ratings_enabled),
+        sections(
+            app.config.radio_enabled,
+            app.config.ratings_enabled,
+            app.config.home_discovery,
+        ),
         accent,
         fg,
         dim,
@@ -293,7 +326,12 @@ pub fn render_help(app: &mut App, frame: &mut Frame) {
     ));
     let (left_all, right_all) = pack_blocks_into_two_columns(blocks);
 
-    let popup_area = help_popup_rect(area, app.config.radio_enabled, app.config.ratings_enabled);
+    let popup_area = help_popup_rect(
+        area,
+        app.config.radio_enabled,
+        app.config.ratings_enabled,
+        app.config.home_discovery,
+    );
 
     // ── Render ────────────────────────────────────────────────────────────────
 

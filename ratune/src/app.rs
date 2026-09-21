@@ -1,4 +1,5 @@
 mod browser_gallery;
+mod discovery;
 mod instant_mix;
 
 use std::collections::{HashMap, HashSet};
@@ -314,6 +315,15 @@ pub struct HomeState {
 
 #[derive(Debug)]
 pub enum LibraryUpdate {
+    DiscoveryShelves {
+        request_id: u64,
+        newest: Result<Vec<ratune_subsonic::Album>, String>,
+        candidates: Result<Vec<ratune_subsonic::Album>, String>,
+    },
+    DiscoveryAlbum {
+        request_id: u64,
+        result: Result<Vec<ratune_subsonic::Song>, String>,
+    },
     Artists(Result<Vec<ratune_subsonic::Artist>, String>),
     Albums {
         artist_id: String,
@@ -553,6 +563,9 @@ pub struct App {
     /// Effective Browse tab layout: toggled at runtime when folder navigation is enabled.
     pub browser_browse_mode: BrowseMode,
     pub browser_art: crate::ui::browser_art::BrowserArt,
+    pub discovery: crate::discovery::Discovery,
+    discovery_album_request: crate::discovery::AlbumRequest,
+    discovery_album_task: Option<tokio::task::AbortHandle>,
     pub browser_album_columns: usize,
     pub browser_album_hits: Vec<(Rect, usize)>,
     pub subsonic: Arc<SubsonicClient>,
@@ -882,6 +895,9 @@ impl App {
             config,
             browser_browse_mode,
             browser_art: crate::ui::browser_art::BrowserArt::default(),
+            discovery: crate::discovery::Discovery::default(),
+            discovery_album_request: crate::discovery::AlbumRequest::default(),
+            discovery_album_task: None,
             browser_album_columns: 1,
             browser_album_hits: Vec::new(),
             should_quit: false,
@@ -1331,6 +1347,10 @@ impl App {
     /// Populate `self.home` from play history.  Called on every entry to the
     /// Home tab (GoToHome, SwitchTab landing, SwitchTabReverse landing).
     pub fn refresh_home_data(&mut self) {
+        if self.config.home_discovery {
+            self.refresh_discovery(false);
+            return;
+        }
         let old_album_ids: Vec<String> = self
             .home
             .recent_albums
@@ -2037,6 +2057,9 @@ impl App {
     fn on_went_online(&mut self) {
         self.offline_browse = None;
         self.prepare_index_browse();
+        if self.active_tab == Tab::Home && self.config.home_discovery {
+            self.refresh_discovery(false);
+        }
         if self.browser_browse_mode == BrowseMode::Files {
             if matches!(
                 self.folders.roots,
@@ -2094,6 +2117,9 @@ impl App {
     fn after_startup_ping_ok(&mut self) {
         self.startup_ping_pending = false;
         self.server_reachable = true;
+        if self.active_tab == Tab::Home && self.config.home_discovery {
+            self.refresh_discovery(false);
+        }
         if self.config.scrobble_enabled && !self.scrobble_queue.is_empty() {
             eprintln!(
                 "scrobble: retrying {} queued scrobble(s)…",
@@ -3036,6 +3062,10 @@ impl App {
 
     pub fn apply_library_update(&mut self, update: LibraryUpdate) {
         match update {
+            update @ (LibraryUpdate::DiscoveryShelves { .. }
+            | LibraryUpdate::DiscoveryAlbum { .. }) => {
+                self.apply_discovery_update(update);
+            }
             LibraryUpdate::Artists(result) => {
                 let mut prefetch_albums: Option<String> = None;
                 self.library.artists = match result {
@@ -3420,6 +3450,9 @@ impl App {
                         self.library_index_by_id =
                             crate::library_index::index_by_id(&self.library_index_tracks);
                         self.index_browse = Some(snapshot);
+                        if self.config.home_discovery {
+                            self.rebuild_discovery_local();
+                        }
                         if !self.server_reachable {
                             self.prepare_offline_browse();
                             if self.browser_browse_mode != BrowseMode::Files {
@@ -5503,6 +5536,14 @@ impl App {
     // ── Action dispatch ───────────────────────────────────────────────────────
 
     pub fn dispatch(&mut self, action: Action) {
+        if self.active_tab == Tab::Home
+            && self.config.home_discovery
+            && self.dispatch_discovery(&action)
+        {
+            #[cfg(target_os = "linux")]
+            self.mpris_after_action(&action);
+            return;
+        }
         let mpris_action_hook = action.clone();
         match action {
             Action::ToggleHelp => {
@@ -7364,6 +7405,7 @@ impl App {
     }
 
     fn handle_clear_queue(&mut self) {
+        self.cancel_discovery_album();
         self.instant_mix.cancel();
         if let Some(task) = self.instant_mix_task.take() {
             task.abort();

@@ -5,6 +5,7 @@ mod color;
 mod config;
 mod debug;
 mod desktop_notify;
+mod discovery;
 mod favorites_cache;
 mod fzf_picker;
 mod history;
@@ -685,7 +686,11 @@ async fn run_loop(
             // ── Home tab art strip redraw after popup close ───────────────────
             // When the `i` popup was closed on the Home tab, re-render the art
             // strip (it was cleared on popup-open to avoid overlapping the popup).
-            if app.home_art_needs_redraw && app.active_tab == app::Tab::Home && !app.help_visible {
+            if app.home_art_needs_redraw
+                && app.active_tab == app::Tab::Home
+                && !app.help_visible
+                && !app.config.home_discovery
+            {
                 if app.config.home_recent_albums_show_art {
                     if let Some(albums_inner) = app.home_recent_albums_inner {
                         ui::kitty_art::render_art_strip(
@@ -1204,6 +1209,25 @@ pub fn scrobble_api_secret(save_keyring: bool) -> Result<()> {
 
 /// Handle mouse clicks within the Home tab center area.
 fn handle_home_click(x: u16, y: u16, app: &mut App, center: ratatui::layout::Rect) {
+    if app.config.home_discovery {
+        if let Some((_, section, index)) = app
+            .discovery
+            .hits
+            .iter()
+            .find(|(r, _, _)| rect_contains(*r, x, y))
+            .copied()
+        {
+            app.discovery.section = section;
+            app.discovery.selected[section] = index;
+            if mouse_click::is_double_click(
+                app,
+                mouse_click::MouseClickTarget::Discovery(section, index),
+            ) {
+                app.dispatch(Action::Select);
+            }
+        }
+        return;
+    }
     use crate::ui::home_tab::compute_home_layout;
 
     if y < center.y || y >= center.y + center.height {
@@ -2244,7 +2268,15 @@ fn handle_mouse_wheel(x: u16, y: u16, dir: Direction, app: &mut App, terminal_si
         Tab::NowPlaying => {
             handle_nowplaying_wheel(x, y, dir, app, areas.center);
         }
-        Tab::Home => {}
+        Tab::Home => {
+            if app.config.home_discovery {
+                let parts = ui::discovery_home::layout(areas.center, app.discovery.section);
+                if let Some(section) = parts.shelves.iter().position(|r| rect_contains(*r, x, y)) {
+                    app.discovery.section = section;
+                    app.discovery.move_selection(dir);
+                }
+            }
+        }
     }
 }
 
@@ -2355,6 +2387,7 @@ fn handle_mouse_click(x: u16, y: u16, app: &mut App, terminal_size: ratatui::lay
             terminal_size,
             app.config.radio_enabled,
             app.config.ratings_enabled,
+            app.config.home_discovery,
         );
         if rect_contains(popup, x, y) {
             mouse_click::clear_pending_click(app);

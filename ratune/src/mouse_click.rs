@@ -10,6 +10,7 @@ pub const DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(450);
 /// Identifies a clickable list/item target for double-click pairing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MouseClickTarget {
+    Discovery(usize, usize),
     BrowserArtist(usize),
     BrowserAlbum(usize),
     BrowserTrack(usize),
