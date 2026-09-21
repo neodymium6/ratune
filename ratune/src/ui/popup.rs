@@ -25,6 +25,7 @@ fn sections(
         ("x / Z", "Shuffle / unshuffle"),
         ("Q", "Toggle queue loop"),
         ("m", "Instant Mix from selected song / cancel pending mix"),
+        ("F8", "Local ↔ Jukebox (server playback)"),
     ];
     if ratings_enabled {
         playback.insert(

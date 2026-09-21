@@ -89,6 +89,20 @@ fn push_scrobble_status_spans(
 
 pub fn render(app: &App, frame: &mut Frame, area: Rect) {
     let t = &app.theme;
+    let label = format!("[{}] ", app.jukebox_label());
+    let mode_width = (label.len() as u16).min(area.width);
+    frame.render_widget(
+        Paragraph::new(label).style(Style::default().fg(app.accent())),
+        Rect {
+            width: mode_width,
+            ..area
+        },
+    );
+    let area = Rect {
+        x: area.x + mode_width,
+        width: area.width - mode_width,
+        ..area
+    };
 
     let line = if app.search_mode.active {
         Line::from(vec![
@@ -108,6 +122,14 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
         ])
     } else if let Some(message) = app.instant_mix_status() {
         let shown = fit_status_bar_text(&message, area.width as usize);
+        Line::from(vec![Span::styled(shown, Style::default().fg(app.accent()))])
+    } else if let Some((message, _)) = app
+        .status_flash
+        .as_ref()
+        .filter(|_| app.jukebox.active() || app.jukebox.busy())
+    {
+        // Remote confirmations must remain visible even while filtering Browse.
+        let shown = fit_status_bar_text(message, area.width as usize);
         Line::from(vec![Span::styled(shown, Style::default().fg(app.accent()))])
     } else if app.search_filter.is_some() {
         let q = app.search_filter.as_deref().unwrap_or("");

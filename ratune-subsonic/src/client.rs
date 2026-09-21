@@ -392,6 +392,50 @@ impl SubsonicClient {
             .ok_or_else(|| anyhow!("missing 'album' field in getAlbum response"))
     }
 
+    /// Read/control the server Jukebox; authenticated transport errors omit URLs.
+    pub async fn jukebox_control(
+        &self,
+        command: &crate::JukeboxCommand,
+    ) -> Result<crate::JukeboxResponse> {
+        let mut params: Vec<(String, String)> = self
+            .auth_params()
+            .into_iter()
+            .map(|(k, v)| (k.into(), v))
+            .collect();
+        params.extend(command.params()?);
+        let env: crate::jukebox::Envelope = self
+            .http
+            .get(self.endpoint_url("jukeboxControl"))
+            .query(&params)
+            .timeout(Duration::from_secs(5))
+            .send()
+            .await
+            .map_err(reqwest::Error::without_url)?
+            .error_for_status()
+            .map_err(reqwest::Error::without_url)?
+            .json()
+            .await
+            .map_err(reqwest::Error::without_url)?;
+        let r = env.response;
+        if r.status != "ok" {
+            if let Some(error) = r.error {
+                return Err(error.into());
+            }
+            return Err(anyhow!("Jukebox returned a failed status"));
+        }
+        if matches!(command, crate::JukeboxCommand::Get) {
+            Ok(crate::JukeboxResponse::Playlist(
+                r.jukebox_playlist
+                    .ok_or_else(|| anyhow!("missing jukeboxPlaylist"))?,
+            ))
+        } else {
+            Ok(crate::JukeboxResponse::Status(
+                r.jukebox_status
+                    .ok_or_else(|| anyhow!("missing jukeboxStatus"))?,
+            ))
+        }
+    }
+
     /// Fetch a bounded newest/random shelf in server order (`getAlbumList2`).
     pub async fn get_discovery_albums(&self, newest: bool, size: u32) -> Result<Vec<Album>> {
         let mut params = self.auth_params();

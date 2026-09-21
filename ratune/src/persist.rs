@@ -52,15 +52,23 @@ fn state_path() -> Result<PathBuf> {
 
 /// Serialize current UI state to `~/.config/ratune/state.json`.
 pub fn save_state(app: &App) -> Result<()> {
+    // Remote playback is authoritative on the server; never overwrite the local
+    // saved queue or software volume with a polled Jukebox snapshot on exit.
+    let (queue, volume) = app
+        .jukebox
+        .local
+        .as_ref()
+        .map(|local| (&local.queue, local.volume))
+        .unwrap_or((&app.queue, app.config.default_volume));
     let state = SavedState {
         active_tab: app.active_tab,
         browser_focus: app.browser_focus,
         selected_artist: app.library.selected_artist,
         selected_album: app.library.selected_album,
         selected_track: app.library.selected_track,
-        queue: app.queue.songs.clone(),
-        queue_cursor: app.queue.cursor,
-        player_volume: Some(app.config.default_volume),
+        queue: queue.songs.clone(),
+        queue_cursor: queue.cursor,
+        player_volume: Some(volume),
         np_pane_focus: app.np_pane_focus,
     };
     let path = state_path()?;

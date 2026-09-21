@@ -57,6 +57,8 @@ pub enum Action {
     ToggleQueueLoop,
     /// Replace the queue with a mix seeded by the selected song, or cancel a pending mix.
     InstantMix,
+    /// Switch between local output and server-side Jukebox playback.
+    ToggleJukebox,
     /// Toggle Now Playing pane focus between live radio and library queue.
     ToggleNpPaneFocus,
     SeekForward,

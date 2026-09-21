@@ -15,3 +15,5 @@ pub use models::{
     Song, Starred2, SubsonicLibrary, DEFAULT_RATING_BRACKET_CLOSE, DEFAULT_RATING_BRACKET_OPEN,
     DEFAULT_RATING_STAR_EMPTY, DEFAULT_RATING_STAR_FILLED, MUSIC_FOLDER_ROOT_ID_PREFIX,
 };
+pub mod jukebox;
+pub use jukebox::{JukeboxCommand, JukeboxPlaylist, JukeboxResponse, JukeboxStatus};

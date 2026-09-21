@@ -1,5 +1,11 @@
 use super::*;
 
+#[cfg(test)]
+#[test]
+fn mix_updates_keep_channel_messages_compact() {
+    assert!(std::mem::size_of::<LibraryUpdate>() <= 256);
+}
+
 impl App {
     pub fn instant_mix_status(&self) -> Option<String> {
         self.instant_mix
@@ -80,7 +86,7 @@ impl App {
                 let _ = tx
                     .send(LibraryUpdate::InstantMix {
                         request_id,
-                        seed,
+                        seed: Box::new(seed),
                         result,
                     })
                     .await;

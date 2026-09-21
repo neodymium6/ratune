@@ -11,6 +11,17 @@ from tui_harness import prepare_state
 
 
 class FixtureTests(unittest.TestCase):
+    def test_jukebox_reads_are_passive_and_ambiguous_failure_applies_once(self):
+        fixture = Fixture(jukebox=True)
+        before = fixture.jukebox.snapshot()
+        fixture.response("jukeboxControl", {"action": ["get"]})
+        self.assertEqual(fixture.jukebox.snapshot(), before)
+        fixture.jukebox.fail_after_action = "setGain"
+        result = fixture.response("jukeboxControl", {"action": ["setGain"], "gain": ["0.4"]})
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(fixture.jukebox.snapshot()["gain"], 0.4)
+        self.assertEqual(fixture.jukebox.snapshot()["commands"], ["setGain"])
+
     def test_similar_song_responses(self):
         fixture = Fixture()
         for seed, expected in [("seed", ["mix-a", "mix-b", "mix-a"]), ("empty", [])]:
