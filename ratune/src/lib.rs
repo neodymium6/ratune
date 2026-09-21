@@ -476,7 +476,7 @@ async fn run_loop(
 
         if app.ratatui_art_ready() && !app.ratatui_uses_kitty_apc() {
             for (_id, st) in app.home_strip_art.iter_mut() {
-                if let Some(Err(e)) = st.last_encoding_result() {
+                if let Some(Err(e)) = st.protocol.last_encoding_result() {
                     eprintln!("home strip art: {e}");
                 }
             }

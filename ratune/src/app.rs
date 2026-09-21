@@ -775,7 +775,7 @@ pub struct App {
     /// `(bytes_digest, inner_w, inner_h)` — rebuild when pixels or art `Rect` change.
     pub np_art_prep_key: Option<(u64, u16, u16)>,
     /// Home art strip: one protocol state per `album_id`.
-    pub home_strip_art: HashMap<String, ratatui_image::protocol::StatefulProtocol>,
+    pub home_strip_art: HashMap<String, crate::ui::strip_art::StripArt>,
     /// Last thumbnail cell size per album — rebuild strip slot when layout resizes.
     pub home_strip_last_cells: HashMap<String, (u16, u16)>,
     /// Decoded home strip covers — avoids JPEG decode on every ratatui frame (Sixel path).
