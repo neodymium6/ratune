@@ -3,3 +3,4 @@ docs/CONTEXT.md
 /bin/
 /scripts/
 lefthook-local.yml
+__pycache__/

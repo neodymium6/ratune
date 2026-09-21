@@ -157,6 +157,12 @@ cargo build --release
 
 The binary is `target/release/ratune`. Check the build with `ratune --version` (or `-V`).
 
+For development, run `cargo test --workspace --locked`. Synthetic API fixtures
+are checked with `python3 -m unittest discover -s tools -p 'test_*.py'`.
+After `cargo build --locked -p ratune`, `python3 tools/tui_smoke.py` tests the TUI
+using a private tmux server, temporary settings and silent synthetic audio;
+it requires tmux and Python 3, but no real server or credentials.
+
 **Git hooks (optional):** [Lefthook](https://lefthook.dev/install/) runs `cargo fmt` before each commit when Rust files are staged. Install lefthook once (e.g. Arch: `pacman -S lefthook`, Homebrew: `brew install lefthook`, or a [standalone binary](https://github.com/evilmartians/lefthook/releases)), then from the repo root:
 
 ```sh
