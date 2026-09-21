@@ -673,6 +673,26 @@ pub(crate) struct SongBody {
 }
 
 #[derive(Deserialize)]
+pub(crate) struct SimilarSongs2Envelope {
+    #[serde(rename = "subsonic-response")]
+    pub response: SimilarSongs2Body,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct SimilarSongs2Body {
+    pub status: String,
+    pub error: Option<SubsonicError>,
+    #[serde(rename = "similarSongs2")]
+    pub similar_songs: Option<SimilarSongs2>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct SimilarSongs2 {
+    #[serde(default)]
+    pub song: Vec<Song>,
+}
+
+#[derive(Deserialize)]
 pub(crate) struct SearchEnvelope {
     #[serde(rename = "subsonic-response")]
     pub response: SearchBody,

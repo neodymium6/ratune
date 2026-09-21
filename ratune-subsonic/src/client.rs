@@ -30,8 +30,8 @@ use crate::models::{
     InternetRadioStation, InternetRadioStationsEnvelope, LegacyLyricsEnvelope, LyricLine,
     LyricsBySongIdEnvelope, MusicDirectory, MusicDirectoryEnvelope, MusicFolder,
     MusicFoldersEnvelope, PingEnvelope, Playlist, PlaylistDetail, PlaylistEnvelope,
-    PlaylistsEnvelope, ScanStatus, ScanStatusEnvelope, SearchEnvelope, SearchResult3, Song,
-    SongEnvelope, Starred2, Starred2Envelope, SubsonicLibrary,
+    PlaylistsEnvelope, ScanStatus, ScanStatusEnvelope, SearchEnvelope, SearchResult3,
+    SimilarSongs2Envelope, Song, SongEnvelope, Starred2, Starred2Envelope, SubsonicLibrary,
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -408,6 +408,32 @@ impl SubsonicClient {
         r.song
             .clone()
             .ok_or_else(|| anyhow!("missing 'song' field in getSong response"))
+    }
+
+    /// Fetch server-selected similar songs (`getSimilarSongs2`).
+    ///
+    /// Navidrome accepts song IDs; other servers may require an artist ID.
+    pub async fn get_similar_songs2(&self, id: &str, count: u32) -> Result<Vec<Song>> {
+        let mut params = self.auth_params();
+        params.push(("id", id.to_string()));
+        params.push(("count", count.to_string()));
+        let env: SimilarSongs2Envelope = self
+            .http
+            .get(self.endpoint_url("getSimilarSongs2"))
+            .query(&params)
+            .send()
+            .await
+            .map_err(reqwest::Error::without_url)?
+            .error_for_status()
+            .map_err(reqwest::Error::without_url)?
+            .json()
+            .await
+            .map_err(reqwest::Error::without_url)?;
+        let r = env.response;
+        check_status(&r.status, r.error.as_ref())?;
+        Ok(r.similar_songs
+            .ok_or_else(|| anyhow!("missing 'similarSongs2' field in getSimilarSongs2 response"))?
+            .song)
     }
 
     /// Construct a signed streaming URL for a song (`stream`).
