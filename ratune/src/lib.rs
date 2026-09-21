@@ -10,6 +10,7 @@ mod favorites_cache;
 mod fzf_picker;
 mod history;
 mod instant_mix;
+mod jukebox;
 mod keybinds;
 mod keyring_init;
 mod library_index;
