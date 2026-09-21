@@ -41,7 +41,8 @@ fn sections(
             "Navigation",
             vec![
                 ("j / k", "Scroll up / down"),
-                ("h / l", "Previous / next column (Browser)"),
+                ("h / l", "Browse: albums horizontally / change focus"),
+                ("Esc", "Browse: tracks → albums → artists"),
                 ("1 / 2 / 3", "Go to Home / Browse / Now Playing"),
                 ("Tab", "Next tab"),
                 ("Shift-Tab", "Previous tab"),
@@ -67,7 +68,7 @@ fn sections(
         (
             "Queue",
             vec![
-                ("a", "Add track to queue"),
+                ("a", "Add selected track or gallery album to queue"),
                 ("A", "Add all (artist/album or folder preview)"),
                 ("Ctrl+r", "Replace queue with album or folder preview"),
                 ("Ctrl+a", "Append full index to queue (y/n)"),

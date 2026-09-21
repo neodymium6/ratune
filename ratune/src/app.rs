@@ -1,3 +1,4 @@
+mod browser_gallery;
 mod instant_mix;
 
 use std::collections::{HashMap, HashSet};
@@ -551,6 +552,9 @@ pub struct App {
     pub config: Config,
     /// Effective Browse tab layout: toggled at runtime when folder navigation is enabled.
     pub browser_browse_mode: BrowseMode,
+    pub browser_art: crate::ui::browser_art::BrowserArt,
+    pub browser_album_columns: usize,
+    pub browser_album_hits: Vec<(Rect, usize)>,
     pub subsonic: Arc<SubsonicClient>,
     /// Set at startup when the Subsonic `ping` fails for a non-auth reason (e.g. no network).
     pub server_reachable: bool,
@@ -877,6 +881,9 @@ impl App {
             player_join: Some(player_join),
             config,
             browser_browse_mode,
+            browser_art: crate::ui::browser_art::BrowserArt::default(),
+            browser_album_columns: 1,
+            browser_album_hits: Vec::new(),
             should_quit: false,
             search_mode: SearchMode::default(),
             search_filter: None,
@@ -1146,6 +1153,7 @@ impl App {
 
     /// Drop all `ratatui-image` protocol state (tab switch, help overlay, fzf suspend, …).
     pub fn clear_ratatui_art_state(&mut self) {
+        self.browser_art.invalidate();
         self.np_art_state = None;
         self.np_art_prep_key = None;
         self.np_kitty_prepared = None;
@@ -5723,8 +5731,16 @@ impl App {
             Action::ToggleRadioPicker => self.toggle_radio_picker(),
             Action::RadioPickerSelect => self.play_radio_from_picker(),
             Action::RadioPickerCancel => self.close_radio_picker(),
-            Action::FocusLeft => self.handle_focus_left(),
-            Action::FocusRight => self.handle_focus_right(),
+            Action::FocusLeft => {
+                if !self.navigate_album_horizontal(false) {
+                    self.handle_focus_left();
+                }
+            }
+            Action::FocusRight => {
+                if !self.navigate_album_horizontal(true) {
+                    self.handle_focus_right();
+                }
+            }
             Action::Navigate(dir) => {
                 // On NowPlaying tab with unsynced lyrics visible, j/k scroll
                 // the lyrics pane instead of the queue.
@@ -5752,7 +5768,16 @@ impl App {
             }
             Action::Select => self.handle_select(),
             Action::Back => self.handle_focus_left(),
-            Action::AddToQueue => self.handle_add_to_queue(),
+            Action::AddToQueue => {
+                if self.active_tab == Tab::Browser
+                    && self.browser_browse_mode == BrowseMode::Artists
+                    && self.browser_focus == BrowserColumn::Albums
+                {
+                    self.handle_add_all_to_queue(AddAllMode::Append);
+                } else {
+                    self.handle_add_to_queue();
+                }
+            }
             Action::AddAllToQueue => self.handle_add_all_to_queue(AddAllMode::Append),
             Action::AddAllToQueueReplaceAlbum => {
                 self.handle_add_all_to_queue(AddAllMode::ReplaceAlbum)
@@ -6534,6 +6559,7 @@ impl App {
                 }
             }
             BrowserColumn::Albums => {
+                let line_steps = line_steps.saturating_mul(self.browser_album_columns.max(1));
                 let result = {
                     let artist_id = match self.library.current_artist() {
                         Some(a) => a.id.clone(),
@@ -7060,14 +7086,14 @@ impl App {
             AddAllMode::Append | AddAllMode::Prepend => {
                 let prepend = matches!(mode, AddAllMode::Prepend);
                 match self.browser_focus {
-                    BrowserColumn::Artists | BrowserColumn::Albums => {
+                    BrowserColumn::Artists => {
                         if let Some(artist) = self.library.current_artist() {
                             let artist_id = artist.id.clone();
                             let start_playing = self.queue.songs.is_empty();
                             self.fetch_all_tracks_for_artist(artist_id, start_playing, prepend);
                         }
                     }
-                    BrowserColumn::Tracks => {
+                    BrowserColumn::Albums | BrowserColumn::Tracks => {
                         let album_id = match self.library.current_album() {
                             Some(a) => a.id.clone(),
                             None => return,

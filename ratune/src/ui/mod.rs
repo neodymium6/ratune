@@ -2,6 +2,8 @@ pub mod albums;
 pub mod art_prepare;
 pub mod artists;
 pub mod browser;
+pub mod browser_art;
+pub mod browser_gallery;
 pub mod favorites_overlay;
 pub mod folder_tracks;
 pub mod folders;
@@ -33,6 +35,8 @@ use home_tab::render_home_tab;
 // ── Top-level render ──────────────────────────────────────────────────────────
 
 pub fn render(app: &mut App, frame: &mut Frame) {
+    app.browser_art.begin_frame();
+    app.browser_album_hits.clear();
     app.np_iterm2_rect = None;
     app.np_queue_text_key = None;
     let total_rows = frame.area().height;
