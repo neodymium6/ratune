@@ -17,7 +17,7 @@ def song(song_id, title, track):
 
 
 class Fixture:
-    def __init__(self):
+    def __init__(self, gallery=False):
         self.lock = threading.RLock()
         self.songs = [song(key, title, i + 1) for i, (key, title) in enumerate([
             ("seed", "Seed"), ("empty", "Empty"), ("error", "Error"),
@@ -28,6 +28,16 @@ class Fixture:
         self.albums = {"album": self.album}
         self.artist = dict(id="artist", name="Fixture Artist", albumCount=1,
                            album=[self.album])
+        if gallery:
+            for i in range(1, 19):
+                album_id = f"gallery-{i:02}"
+                tracks = [dict(self.songs[0], id=f"{album_id}-track-{n}",
+                               title=f"Gallery track {n}", albumId=album_id, track=n)
+                          for n in range(1, 4)]
+                self.albums[album_id] = dict(self.album, id=album_id,
+                                            name=f"Gallery {i:02} 日本語のアルバム",
+                                            year=2000+i, songCount=3, song=tracks)
+            self.artist.update(albumCount=len(self.albums), album=list(self.albums.values()))
         self.streams = 0
         self.requests = []
         audio = io.BytesIO()

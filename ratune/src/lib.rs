@@ -492,6 +492,13 @@ async fn run_loop(
             Err(e) => return Err(e.into()),
         }
 
+        match app.browser_art.draw(terminal.backend_mut()) {
+            Ok(()) => {}
+            Err(e) if tty::io_disconnect(&e) => app.should_quit = true,
+            Err(e) if tty::io_interrupted(&e) => {}
+            Err(e) => return Err(e.into()),
+        }
+
         app.apply_home_strip_resize_settle();
 
         drain_ratatui_np_resize_completions(app);
@@ -1950,11 +1957,35 @@ fn browser_column_hit(
     y: u16,
     center: Rect,
     browse_mode: BrowseMode,
+    current_focus: BrowserColumn,
 ) -> Option<BrowserColumnHit> {
     use ratatui::layout::{Constraint, Layout};
 
     if y < center.y || y >= center.y + center.height {
         return None;
+    }
+
+    if browse_mode == BrowseMode::Artists {
+        let parts = ui::browser_gallery::layout(center);
+        let (focus, col_idx, col_area) = if rect_contains(parts.artists, x, y) {
+            (BrowserColumn::Artists, 0, parts.artists)
+        } else if rect_contains(parts.content, x, y) {
+            if current_focus == BrowserColumn::Tracks {
+                (BrowserColumn::Tracks, 2, parts.content)
+            } else {
+                (BrowserColumn::Albums, 1, parts.content)
+            }
+        } else {
+            return None;
+        };
+        if y <= col_area.y || y + 1 >= col_area.bottom() {
+            return None;
+        }
+        return Some(BrowserColumnHit {
+            focus,
+            col_idx,
+            col_area,
+        });
     }
 
     let files_mode = browse_mode == BrowseMode::Files;
@@ -2197,7 +2228,13 @@ fn handle_mouse_wheel(x: u16, y: u16, dir: Direction, app: &mut App, terminal_si
 
     match app.active_tab {
         Tab::Browser => {
-            let Some(hit) = browser_column_hit(x, y, areas.center, app.browser_browse_mode) else {
+            let Some(hit) = browser_column_hit(
+                x,
+                y,
+                areas.center,
+                app.browser_browse_mode,
+                app.browser_focus,
+            ) else {
                 return;
             };
 
@@ -2391,13 +2428,33 @@ fn handle_mouse_click(x: u16, y: u16, app: &mut App, terminal_size: ratatui::lay
             if handle_browser_overlay_click(x, y, app, center) {
                 return;
             }
-            let Some(hit) = browser_column_hit(x, y, center, app.browser_browse_mode) else {
+            let Some(hit) =
+                browser_column_hit(x, y, center, app.browser_browse_mode, app.browser_focus)
+            else {
                 return;
             };
             let visible_row = (y - hit.col_area.y - 1) as usize;
             app.browser_focus = hit.focus;
             let col_idx = hit.col_idx;
             let files_mode = app.browser_browse_mode == BrowseMode::Files;
+
+            if app.browser_browse_mode == BrowseMode::Artists && hit.focus == BrowserColumn::Albums
+            {
+                if let Some(index) = app
+                    .browser_album_hits
+                    .iter()
+                    .find(|(rect, _)| rect_contains(*rect, x, y))
+                    .map(|(_, index)| *index)
+                {
+                    let target = mouse_click::MouseClickTarget::BrowserAlbum(index);
+                    let open = mouse_click::is_double_click(app, target);
+                    app.click_browser_album(index);
+                    if open {
+                        app.dispatch(Action::Select);
+                    }
+                }
+                return;
+            }
 
             if files_mode {
                 match col_idx {
@@ -2452,7 +2509,12 @@ fn handle_mouse_click(x: u16, y: u16, app: &mut App, terminal_size: ratatui::lay
                     if let Some(idx) = orig_idx {
                         let target = mouse_click::MouseClickTarget::BrowserArtist(idx);
                         if mouse_click::is_double_click(app, target) {
-                            app.double_click_browser_artist(idx);
+                            if app.browser_browse_mode == BrowseMode::Artists {
+                                app.click_browser_artist(idx);
+                                app.dispatch(Action::Select);
+                            } else {
+                                app.double_click_browser_artist(idx);
+                            }
                         } else {
                             app.click_browser_artist(idx);
                         }

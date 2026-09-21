@@ -4,7 +4,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
-use super::{albums, artists, favorites_overlay, folder_tracks, folders, playlist_overlay, tracks};
+use super::{favorites_overlay, folder_tracks, folders, playlist_overlay};
 use crate::app::{App, BrowserColumn};
 use crate::config::BrowseMode;
 
@@ -77,31 +77,7 @@ pub fn render(app: &mut App, frame: &mut Frame, area: Rect) {
         BrowseMode::Artists => {}
     }
 
-    let cols = Layout::horizontal([
-        Constraint::Percentage(30),
-        Constraint::Percentage(35),
-        Constraint::Percentage(35),
-    ])
-    .split(area);
-
-    artists::render(
-        app,
-        frame,
-        cols[0],
-        matches!(app.browser_focus, BrowserColumn::Artists),
-    );
-    albums::render(
-        app,
-        frame,
-        cols[1],
-        matches!(app.browser_focus, BrowserColumn::Albums),
-    );
-    tracks::render(
-        app,
-        frame,
-        cols[2],
-        matches!(app.browser_focus, BrowserColumn::Tracks),
-    );
+    super::browser_gallery::render(app, frame, area);
 
     playlist_overlay::render_playlist_overlay(
         frame,

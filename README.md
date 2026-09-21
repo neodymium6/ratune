@@ -406,6 +406,8 @@ Get `session_key` once with `ratune scrobble-auth` (prints the key for config un
 
 ## Default keybinds
 
+Browse (`2`) shows an artist list and album gallery. Use `Enter` to open albums and tracks, `h/l` to move between album cards, `j/k` to move by row, and `Esc` to go back without losing the album selection. `a` appends the selected album; `Ctrl+r` replaces the queue and plays it. Cover thumbnails currently use iTerm2-compatible terminals; other backends show placeholders. Folder browsing keeps its existing layout. The gallery regression scenario is `python3 tools/tui_smoke.py --scenario gallery`.
+
 Instant Mix (`m`) replaces the queue with the selected track and similar songs returned by the server's `getSimilarSongs2` API. Select a track in Browse or Now Playing; on Home, the playing track is used. Press `m` again to cancel. Empty results, errors, and responses received after playback or the queue changes leave the queue untouched. Configure `[keybinds] instant_mix` to rebind it, or set it to `""` to disable it. Recommendation quality and song-seed support depend on the server.
 
 The synthetic end-to-end check is `python3 tools/tui_smoke.py --scenario mix` after building.
