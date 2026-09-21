@@ -13,6 +13,7 @@ mod instant_mix;
 mod keybinds;
 mod keyring_init;
 mod library_index;
+mod local_output;
 mod lyrics;
 mod lyrics_cache;
 #[cfg(test)]

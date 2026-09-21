@@ -577,7 +577,7 @@ pub struct App {
     pub library_rx: mpsc::Receiver<LibraryUpdate>,
     library_tx: mpsc::Sender<LibraryUpdate>,
     /// Send commands to the audio engine thread.
-    pub player_tx: std_mpsc::Sender<PlayerCommand>,
+    pub player_tx: crate::local_output::LocalOutput,
     /// Receive events from the audio engine thread.
     pub player_rx: std_mpsc::Receiver<PlayerEvent>,
     /// Join handle for the audio engine thread; taken on shutdown.
@@ -889,7 +889,7 @@ impl App {
             last_connectivity_probe: None,
             library_rx,
             library_tx,
-            player_tx,
+            player_tx: crate::local_output::LocalOutput::new(player_tx),
             player_rx,
             player_join: Some(player_join),
             config,
