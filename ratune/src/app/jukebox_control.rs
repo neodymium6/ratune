@@ -314,7 +314,7 @@ impl App {
             Shuffle => self.jukebox_operation(Intent::Shuffle),
             InstantMix => {
                 if let Some(song) = self.instant_mix_seed() {
-                    self.jukebox_operation(Intent::Mix(song));
+                    self.jukebox_operation(Intent::Mix(Box::new(song)));
                 } else {
                     self.flash_status(
                         "Jukebox Mix: select a recent track, Browse track or queue track",

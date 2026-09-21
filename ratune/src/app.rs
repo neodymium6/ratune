@@ -359,7 +359,7 @@ pub enum LibraryUpdate {
     },
     InstantMix {
         request_id: u64,
-        seed: ratune_subsonic::Song,
+        seed: Box<ratune_subsonic::Song>,
         result: Result<Vec<ratune_subsonic::Song>, String>,
     },
     /// Lyrics fetched for a song; `lines` is empty when the track has no lyrics.
@@ -3254,7 +3254,7 @@ impl App {
                 seed,
                 result,
             } => {
-                self.apply_instant_mix(request_id, seed, result);
+                self.apply_instant_mix(request_id, *seed, result);
             }
             LibraryUpdate::Lyrics { song_id, lines } => {
                 self.lyrics_loading = false;

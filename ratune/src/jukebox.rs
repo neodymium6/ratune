@@ -76,7 +76,7 @@ pub enum Intent {
     Shuffle,
     Songs { songs: Vec<Song>, replace: bool },
     Album { id: String, replace: bool },
-    Mix(Song),
+    Mix(Box<Song>),
 }
 
 pub async fn read(client: &SubsonicClient) -> Result<JukeboxPlaylist, String> {
@@ -251,6 +251,7 @@ pub async fn execute(
             Intent::Songs { songs, replace }
         }
         Intent::Mix(seed) => {
+            let seed = *seed;
             let similar = client
                 .get_similar_songs2(&seed.id, crate::instant_mix::MIX_COUNT)
                 .await
@@ -296,6 +297,10 @@ mod transport_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn remote_intents_keep_channel_messages_compact() {
+        assert!(std::mem::size_of::<Intent>() <= 64);
+    }
     fn playlist() -> JukeboxPlaylist {
         serde_json::from_value(serde_json::json!({"currentIndex":0,"playing":true,"gain":0.5,"position":12,"entry":[{"id":"one","title":"One"},{"id":"two","title":"Two"}]})).unwrap()
     }
