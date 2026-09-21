@@ -3,6 +3,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::Frame;
+use ratatui_image::protocol::StatefulProtocolType;
 use ratatui_image::thread::ThreadProtocol;
 use ratatui_image::StatefulImage;
 
@@ -175,6 +176,14 @@ fn render_art_placeholder(app: &mut App, frame: &mut Frame, area: Rect) {
             sync_np_ratatui_protocol(app, art_rect);
             let img_resize = app.ratatui_stateful_resize();
             if let Some(ref mut state) = app.np_art_state {
+                if matches!(state.protocol_type(), Some(StatefulProtocolType::ITerm2(_))) {
+                    super::iterm2_overlay::prepare(frame, state, art_rect, img_resize);
+                    if matches!(state.protocol_type(), Some(StatefulProtocolType::ITerm2(image)) if !image.data.is_empty())
+                    {
+                        app.np_iterm2_rect = Some(art_rect);
+                    }
+                    return;
+                }
                 // Bitmap is contain-fit to `art_rect`; widget area matches so gutters stay clear.
                 let w = StatefulImage::default().resize(img_resize);
                 frame.render_stateful_widget(w, art_rect, state);

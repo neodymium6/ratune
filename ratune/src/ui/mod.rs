@@ -6,6 +6,7 @@ pub mod favorites_overlay;
 pub mod folder_tracks;
 pub mod folders;
 pub mod home_tab;
+pub mod iterm2_overlay;
 pub mod kitty_art;
 pub mod layout;
 pub mod list_scroll;
@@ -32,6 +33,8 @@ use home_tab::render_home_tab;
 // ── Top-level render ──────────────────────────────────────────────────────────
 
 pub fn render(app: &mut App, frame: &mut Frame) {
+    app.np_iterm2_rect = None;
+    app.np_queue_text_key = None;
     let total_rows = frame.area().height;
 
     match app.active_tab {
@@ -82,6 +85,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         }
     }
     if app.radio.picker_visible && app.config.radio_enabled {
+        app.np_iterm2_rect = None;
         radio_popup::render(app, frame, frame.area());
     }
     if app.help_visible {

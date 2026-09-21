@@ -394,6 +394,7 @@ async fn run_loop(
     // this latch the loop retries every frame and spams stderr.
     let mut kitty_cover_unrenderable: Option<String> = None;
     let mut last_tab = app.active_tab;
+    let mut iterm2_overlay = ui::iterm2_overlay::Iterm2Overlay::default();
 
     // 2-second fallback: nudge Kitty art re-transmit when it is missing.
     // Checked once per loop iteration (see below).
@@ -464,6 +465,27 @@ async fn run_loop(
             Err(e) => return Err(e.into()),
         }
         match Backend::flush(terminal.backend_mut()) {
+            Ok(()) => {}
+            Err(e) if tty::io_disconnect(&e) => app.should_quit = true,
+            Err(e) if tty::io_interrupted(&e) => {}
+            Err(e) => return Err(e.into()),
+        }
+
+        // Composite cached iTerm2 art after any full-line text redraw by tmux.
+        let iterm2_image = app.np_iterm2_rect.and_then(|rect| {
+            match app.np_art_state.as_ref()?.protocol_type()? {
+                ratatui_image::protocol::StatefulProtocolType::ITerm2(image) => {
+                    Some((image, rect, app.art_cache_fingerprint?))
+                }
+                _ => None,
+            }
+        });
+        let queue_text_key = if app.in_tmux {
+            app.np_queue_text_key
+        } else {
+            None
+        };
+        match iterm2_overlay.draw(terminal.backend_mut(), iterm2_image, queue_text_key) {
             Ok(()) => {}
             Err(e) if tty::io_disconnect(&e) => app.should_quit = true,
             Err(e) if tty::io_interrupted(&e) => {}

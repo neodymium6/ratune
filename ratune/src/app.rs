@@ -769,6 +769,9 @@ pub struct App {
     pub art_picker: Option<ratatui_image::picker::Picker>,
     /// Now Playing album art — encode runs on `ratatui_resize` worker thread (`ThreadProtocol`).
     pub np_art_state: Option<ThreadProtocol>,
+    /// Transient iTerm2 placement and visible queue text fingerprint for this frame.
+    pub np_iterm2_rect: Option<Rect>,
+    pub np_queue_text_key: Option<u64>,
     /// Worker queue for `ResizeRequest` (Now Playing only; home strip stays on-thread for now).
     pub ratatui_resize_tx: Option<Sender<ResizeRequest>>,
     pub ratatui_resize_rx: Option<Receiver<Result<ResizeResponse, ratatui_image::errors::Errors>>>,
@@ -957,6 +960,8 @@ impl App {
             accent_transition_start: None,
             art_picker: None,
             np_art_state: None,
+            np_iterm2_rect: None,
+            np_queue_text_key: None,
             ratatui_resize_tx: None,
             ratatui_resize_rx: None,
             np_art_prep_key: None,
