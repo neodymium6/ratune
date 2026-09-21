@@ -4,6 +4,7 @@ import copy
 import io
 import json
 import threading
+import time
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
@@ -39,6 +40,15 @@ class Fixture:
 
     def response(self, endpoint, params):
         seed = params.get("id", [""])[0]
+        if endpoint == "getSimilarSongs2":
+            if params.get("count") != ["50"]:
+                return {"status": "failed", "error": {"code": 10, "message": "Expected count=50"}}
+            if seed == "slow":
+                time.sleep(5)
+            if seed == "error":
+                return {"status": "failed", "error": {"code": 0, "message": "Fixture mix failure"}}
+            similar = [] if seed == "empty" else [self.songs[4], self.songs[5], self.songs[4]]
+            return {"similarSongs2": {"song": copy.deepcopy(similar)}}
         payloads = {
             "ping": {},
             "getArtists": {"artists": {"index": [{"name": "F", "artist": [self.artist]}]}},

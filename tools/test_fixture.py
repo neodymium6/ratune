@@ -11,6 +11,14 @@ from tui_harness import prepare_state
 
 
 class FixtureTests(unittest.TestCase):
+    def test_similar_song_responses(self):
+        fixture = Fixture()
+        for seed, expected in [("seed", ["mix-a", "mix-b", "mix-a"]), ("empty", [])]:
+            response = fixture.response("getSimilarSongs2", {"id": [seed], "count": ["50"]})
+            self.assertEqual([song["id"] for song in response["similarSongs2"]["song"]], expected)
+        response = fixture.response("getSimilarSongs2", {"id": ["error"], "count": ["50"]})
+        self.assertEqual(response["status"], "failed")
+
     def test_loopback_api_and_silent_audio(self):
         with Fixture() as fixture:
             self.assertEqual(fixture.server.server_address[0], "127.0.0.1")

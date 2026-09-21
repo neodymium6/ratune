@@ -23,6 +23,7 @@ fn sections(
         ("F", "Favorites panel (Browse tab)"),
         ("x / Z", "Shuffle / unshuffle"),
         ("Q", "Toggle queue loop"),
+        ("m", "Instant Mix from selected song / cancel pending mix"),
     ];
     if ratings_enabled {
         playback.insert(

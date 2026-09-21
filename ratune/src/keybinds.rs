@@ -180,6 +180,7 @@ pub struct Keybinds {
     pub shuffle: KeySpec,
     pub unshuffle: KeySpec,
     pub toggle_queue_loop: KeySpec,
+    pub instant_mix: Option<KeySpec>,
     pub toggle_radio: KeySpec,
     pub np_focus_queue: KeySpec,
     pub clear_queue: KeySpec,
@@ -368,6 +369,10 @@ impl Keybinds {
                     code: KeyCode::Char('q'),
                     modifiers: KeyModifiers::SHIFT,
                 },
+            ),
+            instant_mix: resolve_opt(
+                sec.instant_mix.as_deref(),
+                Some(KeySpec::new(KeyCode::Char('m'))),
             ),
             toggle_radio: resolve(
                 sec.toggle_radio.as_deref(),

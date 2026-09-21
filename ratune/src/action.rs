@@ -55,6 +55,8 @@ pub enum Action {
     Unshuffle,
     /// Toggle whether the queue loops after the last track (↻ control).
     ToggleQueueLoop,
+    /// Replace the queue with a mix seeded by the selected song, or cancel a pending mix.
+    InstantMix,
     /// Toggle Now Playing pane focus between live radio and library queue.
     ToggleNpPaneFocus,
     SeekForward,
