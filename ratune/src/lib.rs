@@ -582,7 +582,7 @@ async fn run_loop(
                                     .unwrap_or((10, 20));
                                 let placement = if app.ensure_art_cache_decoded() {
                                     app.art_cache_decoded.as_ref().map(|(_, img)| {
-                                        ui::art_prepare::contain_fit_rect_in_cells(img, inner, font)
+                                        ui::art_prepare::now_playing_art_rect(img, inner, font)
                                     })
                                 } else {
                                     None

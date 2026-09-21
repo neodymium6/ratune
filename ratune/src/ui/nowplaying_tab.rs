@@ -83,7 +83,7 @@ fn np_art_contain_rect(app: &mut App, inner: Rect) -> Rect {
         .unwrap_or((10, 20));
     if app.ensure_art_cache_decoded() {
         if let Some((_, img)) = app.art_cache_decoded.as_ref() {
-            return crate::ui::art_prepare::contain_fit_rect_in_cells(img, inner, font);
+            return crate::ui::art_prepare::now_playing_art_rect(img, inner, font);
         }
     }
     inner
