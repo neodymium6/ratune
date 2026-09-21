@@ -728,6 +728,9 @@ pub struct UiHomeLayoutSection {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct UiHomeTabSection {
+    /// Discovery shelves; false restores the legacy history dashboard.
+    #[serde(default)]
+    pub discovery: Option<bool>,
     #[serde(default)]
     pub recent_albums: Option<UiHomeRecentAlbumsSection>,
     #[serde(default)]
@@ -1344,6 +1347,7 @@ impl RatingStarGlyphs {
 
 #[derive(Debug, Clone)]
 pub struct Config {
+    pub home_discovery: bool,
     pub subsonic_url: String,
     pub subsonic_user: String,
     pub subsonic_pass: String,
@@ -1848,6 +1852,7 @@ impl Config {
             library_navidrome_skip_unchanged_scan: library.navidrome_skip_unchanged_scan,
             library_notify_on_forced_index_refresh: library.notify_on_forced_index_refresh,
             home_recent_albums_show_art,
+            home_discovery: ht.and_then(|h| h.discovery).unwrap_or(true),
             home_cover_fetch_max_px,
             home_top_height_percent,
             home_panels,
@@ -2026,6 +2031,9 @@ box_include_progress = false
 progress_style = "██░"
 # ncmpcpp-style lines for the bottom strip (Home / Browse / NP row). Not used for the queue list.
 # lines = ["$b%t$/b", "%a", "%b"]
+
+[ui.hometab]
+discovery = true  # false restores the history dashboard
 
 [ui.hometab.recent_albums]
 show_art = true

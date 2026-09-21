@@ -22,6 +22,7 @@ impl App {
 
     pub(super) fn instant_mix_seed(&self) -> Option<ratune_subsonic::Song> {
         match self.active_tab {
+            Tab::Home if self.config.home_discovery => self.discovery.selected_seed().cloned(),
             Tab::Browser if self.browser_focus == BrowserColumn::Tracks => {
                 if self.browse_files() {
                     self.folders
@@ -43,6 +44,7 @@ impl App {
     }
 
     pub(super) fn handle_instant_mix(&mut self) {
+        self.cancel_discovery_album();
         if self.instant_mix.cancel() {
             if let Some(task) = self.instant_mix_task.take() {
                 task.abort();
@@ -55,7 +57,13 @@ impl App {
             return;
         }
         let Some(seed) = self.instant_mix_seed().filter(|s| !s.id.trim().is_empty()) else {
-            self.flash_status("Instant Mix: select a song in Browse or Now Playing");
+            self.flash_status(
+                if self.active_tab == Tab::Home && self.config.home_discovery {
+                    "Instant Mix: use J/K to select Start a Mix, then choose a track"
+                } else {
+                    "Instant Mix: select a song in Browse or Now Playing"
+                },
+            );
             return;
         };
         let request_id = self

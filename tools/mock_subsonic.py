@@ -17,8 +17,9 @@ def song(song_id, title, track):
 
 
 class Fixture:
-    def __init__(self, gallery=False):
+    def __init__(self, gallery=False, discovery_failures=False):
         self.lock = threading.RLock()
+        self.discovery_failures = discovery_failures
         self.songs = [song(key, title, i + 1) for i, (key, title) in enumerate([
             ("seed", "Seed"), ("empty", "Empty"), ("error", "Error"),
             ("slow", "Slow"), ("mix-a", "Similar A"), ("mix-b", "Similar B"),
@@ -50,6 +51,18 @@ class Fixture:
 
     def response(self, endpoint, params):
         seed = params.get("id", [""])[0]
+        if endpoint == "getAlbumList2":
+            albums = list(self.albums.values())
+            if params.get("type") == ["newest"]:
+                albums.reverse()
+            return {"albumList2": {"album": copy.deepcopy(albums[:int(params.get("size", ["24"])[0])])}}
+        if endpoint == "getAlbum" and self.discovery_failures:
+            if seed == "gallery-18":
+                return {"status": "failed", "error": {"code": 0, "message": "Fixture album unavailable"}}
+            if seed == "gallery-17":
+                return {"album": dict(self.albums[seed], song=[])}
+            if seed == "gallery-16":
+                time.sleep(5)
         if endpoint == "getSimilarSongs2":
             if params.get("count") != ["50"]:
                 return {"status": "failed", "error": {"code": 10, "message": "Expected count=50"}}

@@ -24,6 +24,7 @@ use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use crate::error::check_status;
+use crate::models::AlbumList2Envelope;
 use crate::models::{
     parse_music_library_root_folder_id, structured_lyrics_to_lines, Album, AlbumEnvelope, Artist,
     ArtistEnvelope, ArtistRef, Artists, ArtistsEnvelope, DirectoryChild, IndexesEnvelope,
@@ -389,6 +390,31 @@ impl SubsonicClient {
         r.album
             .clone()
             .ok_or_else(|| anyhow!("missing 'album' field in getAlbum response"))
+    }
+
+    /// Fetch a bounded newest/random shelf in server order (`getAlbumList2`).
+    pub async fn get_discovery_albums(&self, newest: bool, size: u32) -> Result<Vec<Album>> {
+        let mut params = self.auth_params();
+        params.push(("type", if newest { "newest" } else { "random" }.to_string()));
+        params.push(("size", size.clamp(1, 100).to_string()));
+        let env: AlbumList2Envelope = self
+            .http
+            .get(self.endpoint_url("getAlbumList2"))
+            .query(&params)
+            .send()
+            .await
+            .map_err(reqwest::Error::without_url)?
+            .error_for_status()
+            .map_err(reqwest::Error::without_url)?
+            .json()
+            .await
+            .map_err(reqwest::Error::without_url)?;
+        let response = env.response;
+        check_status(&response.status, response.error.as_ref())?;
+        Ok(response
+            .albums
+            .ok_or_else(|| anyhow!("missing 'albumList2' field"))?
+            .album)
     }
 
     /// Fetch a single song by its ID (`getSong`).

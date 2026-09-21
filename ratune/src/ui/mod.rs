@@ -4,6 +4,7 @@ pub mod artists;
 pub mod browser;
 pub mod browser_art;
 pub mod browser_gallery;
+pub mod discovery_home;
 pub mod favorites_overlay;
 pub mod folder_tracks;
 pub mod folders;
@@ -37,6 +38,7 @@ use home_tab::render_home_tab;
 pub fn render(app: &mut App, frame: &mut Frame) {
     app.browser_art.begin_frame();
     app.browser_album_hits.clear();
+    app.discovery.hits.clear();
     app.np_iterm2_rect = None;
     app.np_queue_text_key = None;
     let total_rows = frame.area().height;
@@ -44,7 +46,11 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     match app.active_tab {
         Tab::Home => {
             let areas = layout::build_layout(frame.area(), &layout::layout_options_for_app(app));
-            render_home_tab(frame, areas.center, app, app.accent(), app.help_visible);
+            if app.config.home_discovery {
+                discovery_home::render(app, frame, areas.center);
+            } else {
+                render_home_tab(frame, areas.center, app, app.accent(), app.help_visible);
+            }
             now_playing::render(app, frame, areas.now_playing);
             status_bar::render(app, frame, areas.status_bar);
             if total_rows >= 20 {
