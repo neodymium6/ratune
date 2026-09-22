@@ -1,7 +1,24 @@
 use super::*;
 use std::io::{Read, Write};
-use std::net::TcpListener;
+use std::net::{TcpListener, TcpStream};
+use std::sync::mpsc;
 use std::thread;
+
+fn read_request(socket: &mut TcpStream) -> String {
+    // Accepted sockets can inherit the listener's nonblocking mode on macOS.
+    socket.set_nonblocking(false).unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    let mut request = Vec::new();
+    let mut buffer = [0; 1024];
+    while !request.windows(4).any(|s| s == b"\r\n\r\n") {
+        let n = socket.read(&mut buffer).unwrap();
+        assert!(n > 0);
+        request.extend_from_slice(&buffer[..n]);
+    }
+    String::from_utf8(request).unwrap()
+}
 
 fn fixture(
     responses: Vec<(&'static str, &'static str)>,
@@ -28,17 +45,7 @@ fn fixture(
                     Err(e) => panic!("fixture accept: {e}"),
                 }
             };
-            socket
-                .set_read_timeout(Some(Duration::from_secs(5)))
-                .unwrap();
-            let mut request = Vec::new();
-            let mut buffer = [0; 1024];
-            while !request.windows(4).any(|s| s == b"\r\n\r\n") {
-                let n = socket.read(&mut buffer).unwrap();
-                assert!(n > 0);
-                request.extend_from_slice(&buffer[..n]);
-            }
-            let request = String::from_utf8(request).unwrap();
+            let request = read_request(&mut socket);
             let path = request
                 .lines()
                 .next()
@@ -69,6 +76,33 @@ fn expected() -> JukeboxPlaylist {
             .clone(),
     )
     .unwrap()
+}
+
+#[test]
+fn fixture_waits_for_delayed_and_fragmented_headers() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    let (mut socket, _) = listener.accept().unwrap();
+    // Exercise inherited nonblocking mode on every platform.
+    socket.set_nonblocking(true).unwrap();
+    let (tx, rx) = mpsc::channel();
+    let server = thread::spawn(move || tx.send(read_request(&mut socket)).unwrap());
+
+    assert_eq!(
+        rx.recv_timeout(Duration::from_millis(50)),
+        Err(mpsc::RecvTimeoutError::Timeout)
+    );
+    client.write_all(b"GET /?action=get HTTP/1.1\r\n").unwrap();
+    assert_eq!(
+        rx.recv_timeout(Duration::from_millis(50)),
+        Err(mpsc::RecvTimeoutError::Timeout)
+    );
+    client.write_all(b"Host: fixture\r\n\r\n").unwrap();
+    assert_eq!(
+        rx.recv_timeout(Duration::from_secs(5)).unwrap(),
+        "GET /?action=get HTTP/1.1\r\nHost: fixture\r\n\r\n"
+    );
+    server.join().unwrap();
 }
 
 #[tokio::test]
